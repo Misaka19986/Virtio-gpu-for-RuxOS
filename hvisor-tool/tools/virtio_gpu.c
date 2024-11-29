@@ -2,16 +2,17 @@
 #include "linux/virtio_gpu.h"
 #include "log.h"
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 
 void virtio_gpu_ctrl_response(VirtIODevice *vdev, GPUCommand *gcmd,
                               GPUControlHeader *resp, size_t resp_len) {
-  log_debug("entering %s", __func__);
+  log_debug("sending response");
   // 因为每个response结构体的头部都是GPUControlHeader，因此其地址就是response结构体的地址
 
-  // TODO: 向iov写数据
-  // 假设iov全是可写的
-  size_t s = buf_to_iov(gcmd->resp_iov, gcmd->resp_iov_cnt, 0, resp, resp_len);
+  // iov[0]所对应的第一个描述符一定是只读的，因此从第二个开始
+  size_t s =
+      buf_to_iov(&gcmd->resp_iov[1], gcmd->resp_iov_cnt - 1, 0, resp, resp_len);
 
   // 根据命令选择返回vq
   int sel = GPU_CONTROL_QUEUE;
@@ -90,7 +91,7 @@ void virtio_gpu_resource_detach_backing(VirtIODevice *vdev, GPUCommand *gcmd) {
 
 int virtio_gpu_simple_process_cmd(struct iovec *iov, const int iov_cnt,
                                   uint16_t resp_idx, VirtIODevice *vdev) {
-  log_debug("entering %s", __func__);
+  log_debug("****** entering %s ******", __func__);
 
   GPUCommand gcmd;
   gcmd.resp_iov = iov;
@@ -103,6 +104,10 @@ int virtio_gpu_simple_process_cmd(struct iovec *iov, const int iov_cnt,
   VIRTIO_GPU_FILL_CMD(iov, iov_cnt, gcmd.control_header);
 
   // 根据cmd_hdr的类型跳转到对应的处理函数
+  /**********************************
+   * 一般的2D渲染调用链是get_display_info->resource_create_2d->resource_attach_backing->set_scanout->get_display_info
+   * ->transfer_to_host_2d->resource_flush->*重复transfer和flush*->结束
+   */
   switch (gcmd.control_header.type) {
   case VIRTIO_GPU_CMD_GET_DISPLAY_INFO:
     virtio_gpu_get_display_info(vdev, &gcmd);
@@ -142,6 +147,11 @@ int virtio_gpu_simple_process_cmd(struct iovec *iov, const int iov_cnt,
     virtio_gpu_ctrl_response_nodata(
         vdev, &gcmd, gcmd.error ? gcmd.error : VIRTIO_GPU_RESP_OK_NODATA);
   }
+
+  // 处理完毕，不需要iov
+  free(gcmd.resp_iov);
+
+  log_debug("****** leaving %s ******", __func__);
 
   return 0;
 }

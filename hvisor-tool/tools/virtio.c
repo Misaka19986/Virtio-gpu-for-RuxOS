@@ -661,7 +661,7 @@ void virtio_mmio_write(VirtIODevice *vdev, uint64_t offset, uint64_t value,
     vqs[regs->queue_sel].ready = value;
     break;
   case VIRTIO_MMIO_QUEUE_NOTIFY:
-    log_debug("zone %d %s queue notify begin", vdev->zone_id,
+    log_debug("****** zone %d %s queue notify begin ******", vdev->zone_id,
               virtio_device_type_to_string(vdev->type));
 
     if (value < vdev->vqs_len) {
@@ -670,7 +670,7 @@ void virtio_mmio_write(VirtIODevice *vdev, uint64_t offset, uint64_t value,
       vqs[value].notify_handler(vdev, &vqs[value]);
     }
 
-    log_debug("zone %d %s queue notify end", vdev->zone_id,
+    log_debug("****** zone %d %s queue notify end ******", vdev->zone_id,
               virtio_device_type_to_string(vdev->type));
 
     break;

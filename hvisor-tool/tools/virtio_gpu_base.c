@@ -193,6 +193,7 @@ int virtio_gpu_handle_single_request(VirtIODevice *vdev, VirtQueue *vq) {
     return -1;
   }
 
+  free(flags);
   return 0;
 }
 
