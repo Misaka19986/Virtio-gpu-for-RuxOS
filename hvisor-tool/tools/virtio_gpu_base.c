@@ -1,4 +1,5 @@
 #include "log.h"
+#include "sys/queue.h"
 #include "virtio.h"
 #include "virtio_gpu.h"
 #include <stdint.h>
@@ -31,7 +32,7 @@ GPUDev *init_gpu_dev(GPURequestedState *requested_state) {
   dev->config.num_scanouts = HVISOR_VIRTIO_GPU_MAX_SCANOUTS;
   dev->config.num_capsets = 0;
 
-  // 初始化scanouts
+  // 初始化scanouts数量
   dev->scanouts_num = 1;
 
   // 初始化scanout 0
@@ -55,6 +56,10 @@ GPUDev *init_gpu_dev(GPURequestedState *requested_state) {
   log_debug("requested state from json, width: %d height: %d",
             dev->requested_states[0].width, dev->requested_states[0].height);
 
+  // 初始化资源列表和命令队列
+  TAILQ_INIT(&dev->resource_list);
+  TAILQ_INIT(&dev->command_queue);
+
   free(requested_state);
 
   return dev;
@@ -69,39 +74,43 @@ int virtio_gpu_init(VirtIODevice *vdev) {
 void virtio_gpu_close(VirtIODevice *vdev) {
   log_info("virtio_gpu close");
 
-  // 回收相关内存
+  // 回收scanouts相关内存
   GPUDev *gdev = (GPUDev *)vdev->dev;
   for (int i = 0; i < gdev->scanouts_num; ++i) {
     free(gdev->scanouts[i].current_cursor);
   }
 
+  // 回收resource相关内存
+  while (!TAILQ_EMPTY(&gdev->resource_list)) {
+    GPUSimpleResource *temp = TAILQ_FIRST(&gdev->resource_list);
+    TAILQ_REMOVE(&gdev->resource_list, temp, next);
+    free(temp);
+  }
+
+  // 回收命令队列内存
+  while (!TAILQ_EMPTY(&gdev->command_queue)) {
+    GPUCommand *temp = TAILQ_FIRST(&gdev->command_queue);
+    TAILQ_REMOVE(&gdev->command_queue, temp, next);
+    free(temp);
+  }
+
   free(gdev);
   gdev = NULL;
-  // for (int i = 0; i < vdev->vqs_len; ++i) {
-  //   // 释放描述符表
-  //   if (vdev->vqs[i].desc_table != NULL) {
-  //     free((void *)vdev->vqs[i].desc_table);
-  //     vdev->vqs[i].desc_table = NULL;
-  //   }
-  //   // 释放可用环
-  //   if (vdev->vqs[i].avail_ring != NULL) {
-  //     free((void *)vdev->vqs[i].avail_ring);
-  //     vdev->vqs[i].avail_ring = NULL;
-  //   }
-  //   // 释放已用环
-  //   if (vdev->vqs[i].used_ring != NULL) {
-  //     free((void *)vdev->vqs[i].used_ring);
-  //     vdev->vqs[i].used_ring = NULL;
-  //   }
-  //   // 销毁互斥锁
-  //   pthread_mutex_destroy(&vdev->vqs[i].used_ring_lock);
-  // }
+
+  // vq由驱动前端管理，这里直接释放
   free(vdev->vqs);
   free(vdev);
 }
 
-void virtio_gpu_reset() {
+void virtio_gpu_reset(GPUDev *gdev) {
   // TODO
+  for (int i = 0; i < HVISOR_VIRTIO_GPU_MAX_SCANOUTS; ++i) {
+    gdev->scanouts[i].resource_id = 0;
+    gdev->scanouts[i].width = 0;
+    gdev->scanouts[i].height = 0;
+    gdev->scanouts[i].x = 0;
+    gdev->scanouts[i].y = 0;
+  }
 }
 
 int virtio_gpu_ctrl_notify_handler(VirtIODevice *vdev, VirtQueue *vq) {

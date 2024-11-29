@@ -1,6 +1,7 @@
 #include "virtio_gpu.h"
 #include "linux/virtio_gpu.h"
 #include "log.h"
+#include "sys/queue.h"
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -59,10 +60,53 @@ void virtio_gpu_get_display_info(VirtIODevice *vdev, GPUCommand *gcmd) {
 
 void virtio_gpu_get_edid(VirtIODevice *vdev, GPUCommand *gcmd) {
   log_debug("entering %s", __func__);
+  // TODO
 }
 
 void virtio_gpu_resource_create_2d(VirtIODevice *vdev, GPUCommand *gcmd) {
   log_debug("entering %s", __func__);
+
+  GPUSimpleResource *res;
+  GPUDev *gdev = vdev->dev;
+  struct virtio_gpu_resource_create_2d create_2d;
+
+  VIRTIO_GPU_FILL_CMD(gcmd->resp_iov, gcmd->resp_iov_cnt, create_2d);
+
+  // 检查想要创建的resource_id是否是0(无法使用0)
+  if (create_2d.resource_id == 0) {
+    log_error("virtio gpu trying to create 2d resource with id 0");
+    gcmd->error = VIRTIO_GPU_RESP_ERR_INVALID_RESOURCE_ID;
+    return;
+  }
+
+  // 检查资源是否已经创建
+  res = virtio_gpu_find_resource(gdev, create_2d.resource_id);
+  if (res) {
+    log_error("virtio gpu trying to create an existing resource with id %d",
+              create_2d.resource_id);
+    gcmd->error = VIRTIO_GPU_RESP_ERR_INVALID_RESOURCE_ID;
+  }
+
+  // 否则新建一个resource
+  res = calloc(1, sizeof(GPUSimpleResource));
+
+  res->width = create_2d.width;
+  res->height = create_2d.height;
+  res->format = create_2d.format;
+  res->resource_id = create_2d.resource_id;
+
+  
+}
+
+GPUSimpleResource *virtio_gpu_find_resource(GPUDev *gdev,
+                                            uint32_t resource_id) {
+  GPUSimpleResource *temp_res;
+  TAILQ_FOREACH(temp_res, &gdev->resource_list, next) {
+    if (temp_res->resource_id == resource_id) {
+      return temp_res;
+    }
+  }
+  return NULL;
 }
 
 void virtio_gpu_resource_unref(VirtIODevice *vdev, GPUCommand *gcmd) {

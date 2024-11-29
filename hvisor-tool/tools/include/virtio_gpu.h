@@ -59,6 +59,8 @@ typedef struct virtio_gpu_simple_resource {
   void *addrs;
   struct iovec *iov;
   int iov_cnt;
+
+  TAILQ_ENTRY(virtio_gpu_simple_resource) next;
 } GPUSimpleResource;
 
 typedef struct virtio_gpu_framebuffer {
@@ -98,9 +100,16 @@ typedef struct virtio_gpu_requested_state {
 typedef struct virtio_gpu_dev {
   GPUConfig config;
   // TODO: scanouts初始化
+  // virtio gpu拥有的scanouts(预分配)
   GPUScanout scanouts[HVISOR_VIRTIO_GPU_MAX_SCANOUTS];
   // TODO: requested_state初始化
+  // 这些scanouts协商出的requested_state
   GPURequestedState requested_states[HVISOR_VIRTIO_GPU_MAX_SCANOUTS];
+  // virtio gpu拥有的resource
+  TAILQ_HEAD(, virtio_gpu_simple_resource) resource_list;
+  // virtio gpu需要异步处理的命令队列
+  TAILQ_HEAD(, virtio_gpu_control_cmd) command_queue;
+  // scanout的具体数目
   int scanouts_num;
 } GPUDev;
 
@@ -112,7 +121,7 @@ typedef struct virtio_gpu_control_cmd {
   bool
       finished; // 表示当前cmd经处理后是否完成响应，如果没有则统一使用no_data响应
   uint32_t error;                            // 报错类型
-  TAILQ_ENTRY(virtio_gpu_ctrl_command) next; // TODO: 异步请求处理
+  TAILQ_ENTRY(virtio_gpu_control_cmd) next; // TODO: 异步请求处理
 } GPUCommand;
 
 /*********************************************************************
@@ -146,7 +155,7 @@ int virtio_gpu_handle_single_request(VirtIODevice *vdev, VirtQueue *vq);
         iov_to_buf(iov, iov_cnt, 0, &out, sizeof(out));                        \
     if (virtiogpufillcmd_s_ != sizeof(out)) {                                  \
       log_error("cannot fill virtio gpu command with input!");                 \
-      return -1;                                                               \
+      return;                                                                  \
     }                                                                          \
   } while (0)
 
@@ -159,7 +168,8 @@ size_t buf_to_iov_full(const struct iovec *iov, int iov_cnt, size_t offset,
                        const void *buf, size_t bytes_need_copy);
 
 // 从iov填充buffer，单次优化
-// 单纯使用command结构体中某一字段的次数较多，因此需要进行只对iov中的一个buffer进行拷贝的情况的优化
+// 单纯使用command结构体中某一字段，或者vq长度仅为2的情况较多
+// 因此需要在只对iov中的一个buffer进行拷贝的情况下的优化
 static inline size_t iov_to_buf(const struct iovec *iov, const int iov_cnt,
                                 size_t offset, void *buf,
                                 size_t bytes_need_copy) {
@@ -210,6 +220,10 @@ void virtio_gpu_get_edid(VirtIODevice *vdev, GPUCommand *gcmd);
 // 对应VIRTIO_GPU_CMD_RESOURCE_CREATE_2D
 // 在host上以guest给定的id，width，height，format创建一个2D资源
 void virtio_gpu_resource_create_2d(VirtIODevice *vdev, GPUCommand *gcmd);
+
+// 查询给定的virtio gpu设备是否有id为resource_id的资源
+// 若没有，则返回NULL
+GPUSimpleResource *virtio_gpu_find_resource(GPUDev *gdev, uint32_t resource_id);
 
 // 对应VIRTIO_GPU_CMD_RESOURCE_UNREF
 // 销毁一个resource
