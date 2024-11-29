@@ -1,0 +1,13 @@
+[package]
+name = "dtb"
+version = "0.1.0"
+edition = "2021"
+authors = ["Leping Wang <xuehao14@126.com>"]
+description = "Device tree basic operations"
+license = "Mulan PSL v2"
+homepage = "https://github.com/syswonder/ruxos"
+repository = "https://github.com/syswonder/ruxos/tree/main/crates/dtb"
+
+[dependencies]
+fdt-rs = { version = "0.4.3", default-features = false }
+lazy_init = { path = "../../crates/lazy_init" }

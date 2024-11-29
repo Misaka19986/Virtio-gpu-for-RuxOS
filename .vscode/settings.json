@@ -1,0 +1,115 @@
+{
+	/* rust */
+	"rust-analyzer.linkedProjects": [
+		"./hvisor/Cargo.toml"
+	],
+	// Prevent "can't find crate for `test`" error on no_std
+	// Ref: https://github.com/rust-lang/vscode-rust/issues/729
+	// For vscode-rust plugin users:
+	"rust.target": "aarch64-unknown-none",
+	// "rust.target": "riscv64gc-unknown-none-elf",
+	// "rust.target": "loongarch64-unknown-none",
+	"rust.all_targets": false,
+	// For Rust Analyzer plugin users:
+	"rust-analyzer.cargo.target": "aarch64-unknown-none",
+	// "rust-analyzer.cargo.target": "riscv64gc-unknown-none-elf",
+	// "rust-analyzer.cargo.target": "loongarch64-unknown-none",
+	"rust-analyzer.checkOnSave.allTargets": false,
+	"rust-analyzer.cargo.features": [
+		"platform_qemu"
+	],
+	/* clangd */
+	"clangd.arguments": [
+		"--compile-commands-dir=${workspaceFolder}/build",
+		"-j=8",
+		"--background-index",
+		"--clang-tidy",
+		"--log=verbose",
+		"--pretty",
+	],
+	"clangd.path": "/usr/bin/clangd-12",
+	"clangd.fallbackFlags": [
+		"-I${workspaceFolder}/hvisor-tool/include",
+		"-I${workspaceFolder}/hvisor-tool/cJSON",
+		"-I${workspaceFolder}/hvisor-tool/tools/include",
+		"-I/usr/local/bin/linux/include",
+		"-I/usr/aarch64-linux-gnu/include",
+		"-I/usr/local/bin/linux/arch/arm64/include",
+		"-DARM64",
+		"-D__KERNEL__",
+		"-DMODULE"
+	],
+	/* ccls */
+	"ccls.launch.command": "/usr/bin/ccls",
+	"ccls.cache.directory": "${workspaceFolder}/.ccls-cache/",
+	/* ccls highlight */
+	"ccls.highlight.function.face": [
+		"enabled"
+	],
+	"ccls.highlight.function.colors": [
+		"#DCDCAA",
+	],
+	"ccls.highlight.member.face": [
+		"textDecoration: underline"
+	],
+	// Mix of variable.face and global.face
+	"ccls.highlight.global.face": [
+		"fontWeight: bolder"
+	],
+	"ccls.highlight.static.face": [
+		"fontStyle: italic"
+	],
+	"ccls.highlight.namespace.face": [
+		"enabled",
+		"fontWeight: bolder"
+	],
+	"ccls.highlight.namespace.colors": [
+		"#00d780",
+	],
+	"ccls.highlight.type.face": [
+		"enabled",
+		"fontWeight: bolder"
+	],
+	"ccls.highlight.type.colors": [
+		"#4EC9B0",
+	],
+	"ccls.highlight.macro.face": [
+		"enabled",
+		"fontWeight: bolder"
+	],
+	"ccls.highlight.macro.colors": [
+		"#4FC1FF",
+	],
+	"ccls.highlight.variable.face": [
+		"enabled"
+	],
+	"ccls.highlight.variable.colors": [
+		"#9CDCFE",
+	],
+	"ccls.highlight.globalVariable.face": [
+		"variable",
+		"global"
+	],
+	"ccls.highlight.parameter.face": [
+		"variable",
+		"color:#9CDCFE"
+	],
+	"ccls.highlight.memberVariable.face": [
+		"variable",
+		"member",
+		"color:#7ca6b7"
+	],
+	"ccls.highlight.enum.face": [
+		"enabled",
+		"fontWeight: bolder",
+		"color:#4FC1FF"
+	],
+	/* C_CPP */
+	"C_Cpp.autocomplete": "disabled",
+	"C_Cpp.formatting": "disabled",
+	"C_Cpp.errorSquiggles": "disabled",
+	"C_Cpp.intelliSenseEngine": "disabled",
+	"C_Cpp.default.configurationProvider": "ccls",
+	/* makefile */
+	"makefile.makefilePath": "${workspaceFolder}/hvisor-tool"
+}

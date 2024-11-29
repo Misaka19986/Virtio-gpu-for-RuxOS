@@ -1,0 +1,20 @@
+/target
+/.vscode
+.DS_Store
+
+# clangd
+/.cache
+compile_commands.json
+
+# downloaded opensbi binary
+/fw_dynamic.bin
+
+*.asm
+disk.img
+actual.out
+qemu.log
+rusty-tags.vi
+apps/c/redis/
+apps/c/iperf/
+apps/c/wamr/
+apps/c/nginx/

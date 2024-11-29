@@ -1,0 +1,17 @@
+[package]
+name = "driver_9p"
+version = "0.1.0"
+edition = "2021"
+authors = ["Zheng Wu <hello_weekday@163.com>"]
+description = "Common traits and types for 9p drivers"
+license = "Mulan PSL v2"
+homepage = "https://github.com/syswonder/ruxos"
+repository = "https://github.com/syswonder/ruxos/tree/main/crates/driver_9p"
+
+[features]
+default = []
+
+[dependencies]
+log = "0.4"
+spin = "0.9"
+driver_common = { path = "../driver_common" }

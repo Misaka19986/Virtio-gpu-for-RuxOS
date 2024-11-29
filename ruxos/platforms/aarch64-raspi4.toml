@@ -1,0 +1,41 @@
+# Architecture identifier.
+arch = "aarch64"
+# Platform identifier.
+platform = "aarch64-raspi4"
+# Platform family.
+family = "aarch64-raspi"
+
+# Base address of the whole physical memory.
+phys-memory-base = "0x0"
+# Size of the whole physical memory.
+phys-memory-size = "0xFC00_0000"     # 3G 960M
+# Base physical address of the kernel image.
+kernel-base-paddr = "0x8_0000"
+# Base virtual address of the kernel image.
+kernel-base-vaddr = "0xffff_0000_0008_0000"
+# virtual start address of the mapping memory.
+mmap-start-vaddr = "0xffff_8000_0000_0000"
+# virtual end address of the mapping memory.
+mmap-end-vaddr = "0xffff_f000_0000_0000"
+# Linear mapping offset, for quick conversions between physical and virtual
+# addresses.
+phys-virt-offset = "0xffff_0000_0000_0000"
+# MMIO regions with format (`base_paddr`, `size`).
+mmio-regions = [
+    ["0xFE34_0000", "0x1000"],      # SD card 
+    ["0xFE20_1000", "0x1000"],      # PL011 UART
+    ["0xFF84_1000", "0x8000"],      # GICv2
+]
+virtio-mmio-regions = []
+# UART Address
+uart-paddr = "0xFE20_1000"
+uart-irq = "0x79"
+
+# Virtio console
+virtio-console-paddr = "0xFFFFFFFF"
+# Virtio console irq
+virtio-console-irq = "0"
+
+# GIC Address
+gicc-paddr = "0xFF84_2000"
+gicd-paddr = "0xFF84_1000"

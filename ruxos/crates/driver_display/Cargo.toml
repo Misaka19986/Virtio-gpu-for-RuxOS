@@ -1,0 +1,12 @@
+[package]
+name = "driver_display"
+version = "0.1.0"
+edition = "2021"
+authors = ["Shiping Yuan <robert_yuan@pku.edu.com>"]
+description = "Common traits and types for graphics device drivers"
+license = "Mulan PSL v2"
+homepage = "https://github.com/syswonder/ruxos"
+repository = "https://github.com/syswonder/ruxos/tree/main/crates/driver_display"
+
+[dependencies]
+driver_common = { path = "../driver_common" }

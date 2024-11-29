@@ -1,0 +1,13 @@
+version: "1.0.0"
+services:
+  env:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8022:22"
+    command: ["/bin/bash"]
+    tty: true
+    stdin_open: true
+    volumes:
+      - .:/Virt-GPU-for-RuxOS

@@ -1,0 +1,4 @@
+alloc
+multitask
+fs
+paging

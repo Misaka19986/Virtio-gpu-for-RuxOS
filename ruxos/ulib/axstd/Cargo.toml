@@ -1,0 +1,83 @@
+[package]
+name = "axstd"
+version = "0.1.0"
+edition = "2021"
+authors = [
+    "Yuekai Jia <equation618@gmail.com>",
+    "yanjuguang <coolyanjg@163.com>",
+    "wudashuai <wu-ds20@mails.tsinghua.edu.cn>",
+    "yfblock <321353225@qq.com>",
+    "scPointer <bhy18@mails.tsinghua.edu.cn>",
+    "Shiping Yuan <robert_yuan@pku.edu.com>",
+]
+description = "ArceOS user library with an interface similar to rust std"
+license = "GPL-3.0-or-later OR Apache-2.0"
+homepage = "https://github.com/rcore-os/arceos"
+repository = "https://github.com/rcore-os/arceos/tree/main/ulib/axstd"
+documentation = "https://rcore-os.github.io/arceos/axstd/index.html"
+
+[features]
+default = []
+
+# Multicore
+smp = ["ruxfeat/smp", "spinlock/smp"]
+
+# Floating point/SIMD
+fp_simd = ["ruxfeat/fp_simd"]
+
+# Interrupts
+irq = ["arceos_api/irq", "ruxfeat/irq"]
+
+# real time clock
+rtc = ["arceos_api/rtc", "ruxfeat/rtc"]
+
+# Memory
+alloc = ["arceos_api/alloc", "ruxfeat/alloc", "axio/alloc"]
+alloc-tlsf = ["ruxfeat/alloc-tlsf"]
+alloc-slab = ["ruxfeat/alloc-slab"]
+alloc-buddy = ["ruxfeat/alloc-buddy"]
+paging = ["ruxfeat/paging"]
+tls = ["ruxfeat/tls"]
+
+# Multi-threading and scheduler
+multitask = ["arceos_api/multitask", "ruxfeat/multitask"]
+sched_fifo = ["ruxfeat/sched_fifo"]
+sched_rr = ["ruxfeat/sched_rr"]
+sched_cfs = ["ruxfeat/sched_cfs"]
+
+# File system
+fs = ["arceos_api/fs", "ruxfeat/fs"]
+myfs = ["arceos_api/myfs", "ruxfeat/myfs"]
+blkfs = ["ruxfeat/blkfs"]
+virtio-9p = ["ruxfeat/virtio-9p"]
+virtio_console = ["ruxfeat/virtio_console"]
+net-9p = ["ruxfeat/net-9p"]
+
+# Networking
+net = ["arceos_api/net", "ruxfeat/net"]
+dns = []
+
+# Display
+display = ["arceos_api/display", "ruxfeat/display"]
+
+# Device drivers
+bus-mmio = ["ruxfeat/bus-mmio"]
+bus-pci = ["ruxfeat/bus-pci"]
+driver-ramdisk = ["ruxfeat/driver-ramdisk"]
+driver-ixgbe = ["ruxfeat/driver-ixgbe"]
+driver-bcm2835-sdhci = ["ruxfeat/driver-bcm2835-sdhci"]
+
+# Logging
+log-level-off = ["ruxfeat/log-level-off"]
+log-level-error = ["ruxfeat/log-level-error"]
+log-level-warn = ["ruxfeat/log-level-warn"]
+log-level-info = ["ruxfeat/log-level-info"]
+log-level-debug = ["ruxfeat/log-level-debug"]
+log-level-trace = ["ruxfeat/log-level-trace"]
+
+[dependencies]
+ruxfeat = { path = "../../api/ruxfeat" }
+arceos_api = { path = "../../api/arceos_api" }
+axio = { path = "../../crates/axio" }
+axerrno = { path = "../../crates/axerrno" }
+spinlock = { path = "../../crates/spinlock" }

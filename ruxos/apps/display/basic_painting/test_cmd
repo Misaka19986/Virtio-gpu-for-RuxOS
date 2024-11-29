@@ -1,0 +1,1 @@
+make A=apps/display/basic_painting GRAPHIC=y LOG=debug ARCH=aarch64 build

@@ -1,0 +1,29 @@
+name: Build & Deploy docs
+
+on: [push, pull_request]
+
+env:
+  rust-toolchain: nightly-2023-09-01
+
+jobs:
+  doc:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+    permissions:
+      contents: write
+    env:
+      default-branch: ${{ format('refs/heads/{0}', github.event.repository.default_branch) }}
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        submodules: recursive
+    - uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: ${{ env.rust-toolchain }}
+    - name: Install gcc multilib
+      run: sudo apt update && sudo apt install -y gcc-multilib
+    - name: Build docs
+      continue-on-error: ${{ github.ref != env.default-branch && github.event_name != 'pull_request' }}
+      run: make doc_check_missing

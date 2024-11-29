@@ -1,0 +1,9 @@
+clang
+-I/usr/local/bin/linux/include
+-I/usr/local/bin/linux/arch/arm64/include
+-I/usr/aarch64-linux-gnu/include
+-I/usr/local/Virt-GPU-for-RuxOS/hvisor-tool/include
+-I/usr/local/Virt-GPU-for-RuxOS/hvisor-tool/tools/include
+-I/usr/local/Virt-GPU-for-RuxOS/hvisor-tool/cJSON
+-D__KERNEL__
+-DMODULE
