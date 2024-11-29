@@ -28,10 +28,10 @@ pub const IRQ_WAKEUP_VIRTIO_DEVICE: usize = 32 + 0x20;
 
 /// non root zone's virtio request handler
 pub fn mmio_virtio_handler(mmio: &mut MMIOAccess, base: usize) -> HvResult {
-    debug!("mmio virtio handler");
+    // debug!("mmio virtio handler");
     let need_interrupt = if mmio.address == QUEUE_NOTIFY { 1 } else { 0 };
     if need_interrupt == 1 {
-        debug!("notify !!!, cpu id is {}", this_cpu_id());
+        debug!("get data request from cpu {}", this_cpu_id());
     }
     mmio.address += base;
     let mut dev = VIRTIO_BRIDGE.lock();
@@ -84,7 +84,7 @@ pub fn mmio_virtio_handler(mmio: &mut MMIOAccess, base: usize) -> HvResult {
             debug!("non root receives value: {:#x?}", mmio.value);
         }
     }
-    debug!("non root returns");
+    // debug!("non root returns");
     Ok(())
 }
 

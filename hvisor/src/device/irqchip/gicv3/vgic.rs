@@ -179,10 +179,10 @@ fn vgicv3_handle_irq_ops(mmio: &mut MMIOAccess, irq: u32) -> HvResult {
     let zone_r = zone.read();
 
     if !is_spi(irq) || !zone_r.irq_in_zone(irq) {
-        debug!(
-            "gicd-mmio: skip irq {} access, reg = {:#x?}",
-            irq, mmio.address
-        );
+        // debug!(
+        //     "gicd-mmio: skip irq {} access, reg = {:#x?}",
+        //     irq, mmio.address
+        // );
         return Ok(());
     }
 

@@ -17,7 +17,7 @@ QEMU_ARGS += -global arm-smmuv3.stage=2
 
 QEMU_ARGS += -cpu cortex-a57
 QEMU_ARGS += -smp 4
-QEMU_ARGS += -m 3G
+QEMU_ARGS += -m 4G
 QEMU_ARGS += -nographic
 QEMU_ARGS += -bios $(UBOOT)
 
@@ -51,11 +51,13 @@ QEMU_ARGS += -device virtio-net-pci,netdev=net1,disable-legacy=on,disable-modern
 
 # QEMU_ARGS += -device pci-testdev
 
-QEMU_ARGS += -netdev type=user,id=net2
-QEMU_ARGS += -device virtio-net-pci,netdev=net2,disable-legacy=on,disable-modern=off,iommu_platform=on
+# QEMU_ARGS += -netdev type=user,id=net2
+# QEMU_ARGS += -device virtio-net-pci,netdev=net2,disable-legacy=on,disable-modern=off,iommu_platform=on
 
-QEMU_ARGS += -netdev type=user,id=net3
-QEMU_ARGS += -device virtio-net-pci,netdev=net3,disable-legacy=on,disable-modern=off,iommu_platform=on
+# QEMU_ARGS += -netdev type=user,id=net3
+# QEMU_ARGS += -device virtio-net-pci,netdev=net3,disable-legacy=on,disable-modern=off,iommu_platform=on
+
+QEMU_ARGS += -device VGA
 
 $(hvisor_bin): elf
 	@if ! command -v mkimage > /dev/null; then \

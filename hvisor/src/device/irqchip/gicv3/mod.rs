@@ -172,14 +172,14 @@ pub fn gicv3_handle_irq_el1() {
                 // virtual timer interrupt
                 TIMER_INTERRUPT_COUNTER.fetch_add(1, core::sync::atomic::Ordering::SeqCst);
                 if TIMER_INTERRUPT_COUNTER.load(core::sync::atomic::Ordering::SeqCst) % TIMER_INTERRUPT_PRINT_TIMES == 0 {
-                    debug!("Virtual timer interrupt, counter = {}", TIMER_INTERRUPT_COUNTER.load(core::sync::atomic::Ordering::SeqCst));
+                    // debug!("Virtual timer interrupt, counter = {}", TIMER_INTERRUPT_COUNTER.load(core::sync::atomic::Ordering::SeqCst));
                 }
             } else if irq_id == 25 {
                 // maintenace interrupt
                 handle_maintenace_interrupt();
             } else if irq_id > 31 {
                 //inject phy irq
-                debug!("*** get spi_irq id = {}", irq_id);
+                // debug!("*** get spi_irq id = {}", irq_id);
             } else {
                 warn!("not konw irq id = {}", irq_id);
             }

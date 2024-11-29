@@ -166,6 +166,7 @@ int virtio_gpu_handle_single_request(VirtIODevice *vdev, VirtQueue *vq) {
   // debug
   for (int i = 0; i < desc_processed_num; ++i) {
     char s[50] = "";
+
     if (flags[i] & VRING_DESC_F_WRITE) {
       strcat(s, "VRING_DESC_F_WRITE | ");
     } else {
@@ -179,7 +180,7 @@ int virtio_gpu_handle_single_request(VirtIODevice *vdev, VirtQueue *vq) {
       strcat(s, "VRING_DESC_F_INDIRECT");
     }
 
-    log_debug("desc %d get flags: %s", s);
+    log_debug("desc %d get flags: %s", i, s);
   }
 
   // 解析iov，获得相应指令并处理

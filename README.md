@@ -148,6 +148,7 @@ sudo apt install git sudo vim bash-completion \
 ```
 
 Ubuntu base 20.04.5 arm64并没有init程序，需要手动安装
+注: 若安装完整的systemd会导致启动较慢，但是有完整的shell和其他功能可用
 
 ```shell
 apt install systemd systemd-sysv
