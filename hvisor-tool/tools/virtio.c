@@ -198,7 +198,7 @@ VirtIODevice *create_virtio_device(VirtioDeviceType dev_type, uint32_t zone_id,
     goto err;
   }
 
-  log_info("create virtio device %d success", dev_type);
+  log_info("create %s success", virtio_device_type_to_string(dev_type));
   vdevs[vdevs_num++] = vdev;
 
   return vdev;
@@ -1111,6 +1111,7 @@ int virtio_start_from_json(char *json_path) {
         log_error("Invalid memory size");
         continue;
       }
+      // 将从zone0_ipa开始
       virt_addr = mmap(NULL, mem_size, PROT_READ | PROT_WRITE, MAP_SHARED,
                        ko_fd, (off_t)zone0_ipa);
       if (virt_addr == (void *)-1) {

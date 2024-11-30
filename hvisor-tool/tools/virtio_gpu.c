@@ -230,9 +230,26 @@ static int virtio_gpu_create_mapping_iov(VirtIODevice *vdev,
   entries = malloc(entries_size);
   log_debug("%s got %d entries with total size %d", __func__, nr_entries,
             entries_size);
-  // 先将请求中附带的所有内存入口拷贝到iov
+  // 先将请求中附带的所有内存入口拷贝到entries
   size_t s = iov_to_buf(gcmd->resp_iov, gcmd->resp_iov_cnt, offset, entries,
                         entries_size);
+  if (s != entries_size) {
+    log_error("%s failed to copy memory entries to iov", __func__);
+    free(entries);
+    return -1;
+  }
+
+  *iov = NULL;
+  if (addr) {
+    *addr = NULL;
+  }
+
+  for (int e = 0, v = 0; e < nr_entries; ++e) {
+    uint64_t addr = entries[e].addr;
+    uint32_t length = entries[e].length;
+
+    
+  }
 
   return 0;
 }
