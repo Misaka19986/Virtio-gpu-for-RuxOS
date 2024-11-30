@@ -62,6 +62,9 @@ GPUDev *init_gpu_dev(GPURequestedState *requested_state) {
 
   free(requested_state);
 
+  // 初始化内存计数
+  dev->hostmem = 0;
+
   return dev;
 }
 
@@ -194,19 +197,14 @@ int virtio_gpu_handle_single_request(VirtIODevice *vdev, VirtQueue *vq) {
 
   // 解析iov，获得相应指令并处理
   // TODO: 把这部分交给其他线程处理，hvisor进程直接从当前函数返回
-  int err = virtio_gpu_simple_process_cmd(iov, desc_processed_num,
-                                          first_idx_on_chain, vdev);
-  if (err < 0) {
-    // 丢弃这条指令
-    free(flags);
-    return -1;
-  }
+  virtio_gpu_simple_process_cmd(iov, desc_processed_num, first_idx_on_chain,
+                                vdev);
 
   free(flags);
   return 0;
 }
 
-size_t iov_to_buf_full(const struct iovec *iov, const int iov_cnt,
+size_t iov_to_buf_full(const struct iovec *iov, const unsigned int iov_cnt,
                        size_t offset, void *buf, size_t bytes_need_copy) {
   size_t done;
   unsigned int i;
@@ -229,8 +227,8 @@ size_t iov_to_buf_full(const struct iovec *iov, const int iov_cnt,
   return done;
 }
 
-size_t buf_to_iov_full(const struct iovec *iov, int iov_cnt, size_t offset,
-                       const void *buf, size_t bytes_need_copy) {
+size_t buf_to_iov_full(const struct iovec *iov, unsigned int iov_cnt,
+                       size_t offset, const void *buf, size_t bytes_need_copy) {
   size_t done;
   unsigned int i;
   for (i = 0, done = 0; (offset || done < bytes_need_copy) && i < iov_cnt;

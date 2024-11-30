@@ -56,13 +56,14 @@ struct VirtQueue {
   uint64_t num;           // 由驱动前端决定的virtqueue容量大小
   uint32_t queue_num_max; // virtqueue的最大容量，由后端告知
 
-  uint64_t desc_table_addr; // 描述符表地址
-  uint64_t avail_addr;      // 可用环地址
-  uint64_t used_addr;       // 已用环地址
+  uint64_t desc_table_addr; // 描述符表地址(zonex设置的物理地址)
+  uint64_t avail_addr;      // 可用环地址(zonex设置的物理地址)
+  uint64_t used_addr;       // 已用环地址(zonex设置的物理地址)
 
-  volatile VirtqDesc *desc_table;  // 描述符表
-  volatile VirtqAvail *avail_ring; // 可用环
-  volatile VirtqUsed *used_ring;   // 已用环
+  // 由get_virt_addr转换得到
+  volatile VirtqDesc *desc_table;  // 描述符表(zone0设置的物理地址)
+  volatile VirtqAvail *avail_ring; // 可用环(zone0设置的物理地址)
+  volatile VirtqUsed *used_ring;   // 已用环(zone0设置的物理地址)
   int (*notify_handler)(VirtIODevice *vdev,
                         VirtQueue *vq); // 当virtqueue有可处理请求时，调用该函数
 
