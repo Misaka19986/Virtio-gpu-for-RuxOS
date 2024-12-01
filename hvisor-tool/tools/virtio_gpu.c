@@ -203,6 +203,8 @@ static void virtio_gpu_resource_unref(VirtIODevice *vdev, GPUCommand *gcmd) {
 
 static void virtio_gpu_resource_flush(VirtIODevice *vdev, GPUCommand *gcmd) {
   log_debug("entering %s", __func__);
+
+  // TODO: flush image to device
 }
 
 static void virtio_gpu_set_scanout(VirtIODevice *vdev, GPUCommand *gcmd) {
@@ -350,7 +352,7 @@ static void virtio_gpu_transfer_to_host_2d(VirtIODevice *vdev,
   int bpp = 32;
   uint32_t stride = res->hostmem / res->height;
 
-  // TODO: 写resource的iov到显示设备内存
+  // TODO: 写resource的iov到image
   // iov_to_buf
 }
 
