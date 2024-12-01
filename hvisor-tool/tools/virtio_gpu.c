@@ -2,6 +2,7 @@
 #include "linux/virtio_gpu.h"
 #include "log.h"
 #include "sys/queue.h"
+#include "virtio.h"
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -57,11 +58,14 @@ static void virtio_gpu_get_display_info(VirtIODevice *vdev, GPUCommand *gcmd) {
 
   // 向响应结构体填入display信息
   for (int i = 0; i < HVISOR_VIRTIO_GPU_MAX_SCANOUTS; ++i) {
-    display_info.pmodes[i].enabled = 1;
-    display_info.pmodes[i].r.width = gdev->requested_states[i].width;
-    display_info.pmodes[i].r.height = gdev->requested_states[i].height;
-    log_debug("return display info of scanout %d with width %d, height %d", i,
-              display_info.pmodes[i].r.width, display_info.pmodes[i].r.height);
+    if (gdev->enabled_scanout_bitmask & (1 << i)) {
+      display_info.pmodes[i].enabled = 1;
+      display_info.pmodes[i].r.width = gdev->requested_states[i].width;
+      display_info.pmodes[i].r.height = gdev->requested_states[i].height;
+      log_debug("return display info of scanout %d with width %d, height %d", i,
+                display_info.pmodes[i].r.width,
+                display_info.pmodes[i].r.height);
+    }
   }
 
   virtio_gpu_ctrl_response(vdev, gcmd, &display_info.hdr, sizeof(display_info));
@@ -106,30 +110,42 @@ static void virtio_gpu_resource_create_2d(VirtIODevice *vdev,
   res->height = create_2d.height;
   res->format = create_2d.format;
   res->resource_id = create_2d.resource_id;
+  res->scanout_bitmask = 0;
   res->iov = NULL;
   res->iov_cnt = 0;
+  res->image = NULL;
 
   // 计算resource所占用的内存大小
   // 默认只支持bpp为4 bytes大小的format
   res->hostmem = calc_image_hostmem(32, create_2d.width, create_2d.height);
-  if (res->hostmem + gdev->hostmem < VIRTIO_GPU_MAX_HOSTMEM) {
-    // 内存足够，将res加入virtio gpu下管理
-    TAILQ_INSERT_HEAD(&gdev->resource_list, res, next);
-    gdev->hostmem += res->hostmem;
-
-    log_debug("add a resource %d to gpu dev of zone %d, width: %d height: %d "
-              "format: %d mem: %d host-hostmem: %d",
-              res->resource_id, vdev->zone_id, res->width, res->height,
-              res->format, res->hostmem, gdev->hostmem);
-
-    return;
-  } else {
+  if (res->hostmem + gdev->hostmem >= VIRTIO_GPU_MAX_HOSTMEM) {
     log_error("virtio gpu for zone %d out of hostmem when trying to create "
               "resource %d",
               vdev->zone_id, create_2d.resource_id);
     free(res);
     return;
   }
+
+  // TODO: alloc image
+
+  // if (!res->image) {
+  //   log_error("%s failed to create image for resource %d",
+  //             create_2d.resource_id);
+  //   free(res);
+  //   gcmd->error = VIRTIO_GPU_RESP_ERR_OUT_OF_MEMORY;
+  //   return;
+  // }
+
+  // 内存足够，将res加入virtio gpu下管理
+  TAILQ_INSERT_HEAD(&gdev->resource_list, res, next);
+  gdev->hostmem += res->hostmem;
+
+  log_debug("add a resource %d to gpu dev of zone %d, width: %d height: %d "
+            "format: %d mem: %d host-hostmem: %d",
+            res->resource_id, vdev->zone_id, res->width, res->height,
+            res->format, res->hostmem, gdev->hostmem);
+
+  return;
 }
 
 static GPUSimpleResource *virtio_gpu_find_resource(GPUDev *gdev,
@@ -141,6 +157,35 @@ static GPUSimpleResource *virtio_gpu_find_resource(GPUDev *gdev,
     }
   }
   return NULL;
+}
+
+static GPUSimpleResource *virtio_gpu_check_resource(VirtIODevice *vdev,
+                                                    uint32_t resource_id,
+                                                    const char *caller,
+                                                    uint32_t *error) {
+  GPUSimpleResource *res;
+  GPUDev *gdev = vdev->dev;
+
+  res = virtio_gpu_find_resource(gdev, resource_id);
+  if (!res) {
+    log_error("%s cannot find resource by id %d", caller, resource_id);
+    if (error) {
+      *error = VIRTIO_GPU_RESP_ERR_INVALID_RESOURCE_ID;
+    }
+    return NULL;
+  }
+
+  // TODO: image
+  if (!res->iov || res->hostmem <= 0 /*|| !res->image*/) {
+    log_error("%s found resource %d has no backing storage", caller,
+              resource_id);
+    if (error) {
+      *error = VIRTIO_GPU_RESP_ERR_UNSPEC;
+    }
+    return NULL;
+  }
+
+  return res;
 }
 
 static uint32_t calc_image_hostmem(int bits_per_pixel, uint32_t width,
@@ -162,11 +207,151 @@ static void virtio_gpu_resource_flush(VirtIODevice *vdev, GPUCommand *gcmd) {
 
 static void virtio_gpu_set_scanout(VirtIODevice *vdev, GPUCommand *gcmd) {
   log_debug("entering %s", __func__);
+
+  GPUDev *gdev = vdev->dev;
+
+  GPUSimpleResource *res;
+  GPUFrameBuffer fb = {0};
+  struct virtio_gpu_set_scanout set_scanout;
+
+  VIRTIO_GPU_FILL_CMD(gcmd->resp_iov, gcmd->resp_iov_cnt, set_scanout);
+
+  // 检查scanout id是否有效
+  if (set_scanout.scanout_id >= gdev->scanouts_num) {
+    log_error("%s setting invalid scanout with scanout_id %d", __func__,
+              set_scanout.scanout_id);
+    gcmd->error = VIRTIO_GPU_RESP_ERR_INVALID_SCANOUT_ID;
+    return;
+  }
+
+  // 不能使用id为0的resource
+  // if (set_scanout.resource_id == 0) {
+
+  // }
+
+  res = virtio_gpu_check_resource(vdev, set_scanout.resource_id, __func__,
+                                  &gcmd->error);
+  if (!res) {
+    return;
+  }
+
+  log_debug("%s setting scanout %d with resource %d", __func__,
+            set_scanout.scanout_id, set_scanout.resource_id);
+
+  // TODO: image
+  fb.format = res->format;
+  fb.bytes_pp = 4; // format都是32bits pp，即4bytes pp
+  fb.width = res->width;
+  fb.height = res->height;
+  fb.stride = res->hostmem / res->height; // hostmem = height * stride
+  fb.offset = set_scanout.r.x * fb.bytes_pp + set_scanout.r.y * fb.stride;
+
+  // 进入真正的设置函数
+  virtio_gpu_do_set_scanout(vdev, set_scanout.scanout_id, &fb, res,
+                            &set_scanout.r, &gcmd->error);
+}
+
+static bool virtio_gpu_do_set_scanout(VirtIODevice *vdev, uint32_t scanout_id,
+                                      GPUFrameBuffer *fb,
+                                      GPUSimpleResource *res,
+                                      struct virtio_gpu_rect *r,
+                                      uint32_t *error) {
+  GPUDev *gdev = vdev->dev;
+  GPUScanout *scanout;
+
+  scanout = &gdev->scanouts[scanout_id];
+
+  if (r->x > fb->width || r->y > fb->width || r->width < 16 || r->height < 16 ||
+      r->width > fb->width || r->height > fb->height ||
+      r->x + r->width > fb->width || r->y + r->height > fb->height) {
+    log_error("%s find illegal scanout %d bounds for resource %d, rect (%d, "
+              "%d) + %d, %d, fb %d, %d",
+              __func__, scanout_id, res->resource_id, r->x, r->y, r->width,
+              r->height, fb->width, fb->height);
+    *error = VIRTIO_GPU_RESP_ERR_INVALID_PARAMETER;
+    return false;
+  }
+
+  log_debug("%s set scanout display region (%d, %d) + %d, %d, with framebuffer "
+            "%d, %d",
+            __func__, r->x, r->y, r->width, r->height, fb->width, fb->height);
+
+  // TODO: blob相关逻辑(若支持VIRTIO_GPU_F_RESOURCE_BLOB特性)
+
+  // 更新scanout
+  virtio_gpu_update_scanout(vdev, scanout_id, fb, res, r);
+  return true;
+}
+
+static void virtio_gpu_update_scanout(VirtIODevice *vdev, uint32_t scanout_id,
+                                      GPUFrameBuffer *fb,
+                                      GPUSimpleResource *res,
+                                      struct virtio_gpu_rect *r) {
+  GPUDev *gdev = vdev->dev;
+  GPUSimpleResource *origin_res;
+  GPUScanout *scanout;
+
+  scanout = &gdev->scanouts[scanout_id];
+  origin_res = virtio_gpu_find_resource(gdev, scanout->resource_id);
+  if (origin_res) {
+    // 解除原来绑定的resource
+    origin_res->scanout_bitmask &= ~(1 << scanout_id);
+  }
+
+  // 绑定新的resource
+  res->scanout_bitmask |= (1 << scanout_id);
+  log_debug("%s updated scanout %d to resource %d", __func__, scanout_id,
+            res->resource_id);
+  // 更新scanout参数和framebuffer
+  scanout->resource_id = res->resource_id;
+  scanout->x = r->x;
+  scanout->y = r->y;
+  scanout->width = r->width;
+  scanout->height = r->height;
+  scanout->frame_buffer = *fb;
 }
 
 static void virtio_gpu_transfer_to_host_2d(VirtIODevice *vdev,
                                            GPUCommand *gcmd) {
   log_debug("entering %s", __func__);
+
+  GPUDev *gdev = vdev->dev;
+
+  GPUSimpleResource *res;
+  uint32_t src_offset, dst_offset;
+  struct virtio_gpu_transfer_to_host_2d transfer_2d;
+
+  VIRTIO_GPU_FILL_CMD(gcmd->resp_iov, gcmd->resp_iov_cnt, transfer_2d);
+
+  res = virtio_gpu_check_resource(vdev, transfer_2d.resource_id, __func__,
+                                  &gcmd->error);
+  if (!res) {
+    return;
+  }
+
+  if (transfer_2d.r.x > res->width || transfer_2d.r.y > res->height ||
+      transfer_2d.r.width > res->width || transfer_2d.r.height > res->height ||
+      transfer_2d.r.x + transfer_2d.r.width > res->width ||
+      transfer_2d.r.y + transfer_2d.r.height > res->height) {
+    log_error("%s trying to transfer bounds outside resource %d bounds, (%d, "
+              "%d) + %d, %d vs %d, %d",
+              __func__, res->resource_id, transfer_2d.r.x, transfer_2d.r.y,
+              transfer_2d.r.width, transfer_2d.r.height, res->width,
+              res->height);
+    gcmd->error = VIRTIO_GPU_RESP_ERR_INVALID_PARAMETER;
+    return;
+  }
+
+  log_debug("%s transfering a region (%d, %d) + %d, %d from resource %d %d, %d",
+            __func__, transfer_2d.r.x, transfer_2d.r.y, transfer_2d.r.width,
+            transfer_2d.r.height, res->resource_id, res->width, res->height);
+
+  uint32_t format = res->format;
+  int bpp = 32;
+  uint32_t stride = res->hostmem / res->height;
+
+  // TODO: 写resource的iov到显示设备内存
+  // iov_to_buf
 }
 
 static void virtio_gpu_resource_attach_backing(VirtIODevice *vdev,
@@ -198,9 +383,9 @@ static void virtio_gpu_resource_attach_backing(VirtIODevice *vdev,
   log_debug("attaching guest mem to resource %d of gpu dev from zone %d",
             res->resource_id, vdev->zone_id);
 
-  int err = virtio_gpu_create_mapping_iov(
-      vdev, attach_backing.nr_entries, sizeof(attach_backing), gcmd,
-      &res->addrs, &res->iov, &res->iov_cnt);
+  int err = virtio_gpu_create_mapping_iov(vdev, attach_backing.nr_entries,
+                                          sizeof(attach_backing), gcmd,
+                                          &res->iov, &res->iov_cnt);
   if (err != 0) {
     log_error("%s failed to map guest memory to iov", __func__);
     gcmd->error = VIRTIO_GPU_RESP_ERR_UNSPEC;
@@ -210,12 +395,14 @@ static void virtio_gpu_resource_attach_backing(VirtIODevice *vdev,
 
 static int virtio_gpu_create_mapping_iov(VirtIODevice *vdev,
                                          uint32_t nr_entries, uint32_t offset,
-                                         GPUCommand *gcmd, uint64_t **addr,
+                                         GPUCommand *gcmd, /*uint64_t **addr,*/
                                          struct iovec **iov, uint32_t *niov) {
+  log_debug("entering %s", __func__);
   GPUDev *gdev = vdev->dev;
 
   struct virtio_gpu_mem_entry *entries; // 存储所有guest内存入口的数组
   size_t entries_size;
+  int e, v;
 
   if (nr_entries > 16384) {
     log_error(
@@ -234,22 +421,57 @@ static int virtio_gpu_create_mapping_iov(VirtIODevice *vdev,
   size_t s = iov_to_buf(gcmd->resp_iov, gcmd->resp_iov_cnt, offset, entries,
                         entries_size);
   if (s != entries_size) {
-    log_error("%s failed to copy memory entries to iov", __func__);
+    log_error("%s failed to copy memory entries to buffer", __func__);
     free(entries);
     return -1;
   }
 
   *iov = NULL;
-  if (addr) {
-    *addr = NULL;
-  }
+  // if (addr) {
+  //   *addr = NULL;
+  // }
 
-  for (int e = 0, v = 0; e < nr_entries; ++e) {
-    uint64_t addr = entries[e].addr;
-    uint32_t length = entries[e].length;
+  for (e = 0, v = 0; e < nr_entries; ++e, ++v) {
+    uint64_t e_addr = entries[e].addr;     // guest内存块的起始位置
+    uint32_t e_length = entries[e].length; // guest内存块的长度
 
-    
+    // 由于zonex的全部内存会映射到zone0
+    // 而zone start时会将zonex的所有内存映射到hvisor-tool的虚拟内存空间
+    // 因此这里只需要将zonex用来存储资源数据的内存块的虚拟地址用iov管理即可
+
+    // iov以16个为一组进行分配，如果不够则重新分配内存
+    if (!(v % 16)) {
+      struct iovec *temp = realloc(*iov, (v + 16) * sizeof(struct iovec));
+      if (temp == NULL) {
+        // 无法分配
+        log_error("%s cannot alloc enough memory for iov", __func__);
+        free(*iov); // 直接释放iov数组
+        free(entries);
+        *iov = NULL;
+        return -1;
+      }
+      *iov = temp;
+      // if (addr) {
+      //   *addr = realloc(*addr, (v * 16) * sizeof(uint64_t));
+      // }
+    }
+
+    (*iov)[v].iov_base = get_virt_addr((void *)e_addr, vdev->zone_id);
+    (*iov)[v].iov_len = e_length;
+    log_debug("guest addr %x map to %x with size %d", e_addr,
+              (*iov)[v].iov_base, (*iov)[v].iov_len);
+    // if (addr) {
+    //   (*addr)[v] = a;
+    // }
+
+    // 考虑到后期更改时，也许zonex到zone0的映射并不是直接的，而是通过dma等方式重新分配
+    // 因此保留e、v来应对entries和iov不一一对应的情况
   }
+  *niov = v;
+  log_debug("%d memory blocks mapped", *niov);
+
+  // 释放entries
+  free(entries);
 
   return 0;
 }
@@ -277,7 +499,7 @@ static void virtio_gpu_simple_process_cmd(struct iovec *iov,
 
   // 根据cmd_hdr的类型跳转到对应的处理函数
   /**********************************
-   * 一般的2D渲染调用链是get_display_info->resource_create_2d->resource_attach_backing->set_scanout->get_display_info
+   * 一般的2D渲染调用链是get_display_info->resource_create_2d->resource_attach_backing->set_scanout->get_display_info(确定是否设置成功)
    * ->transfer_to_host_2d->resource_flush->*重复transfer和flush*->结束
    */
   switch (gcmd.control_header.type) {

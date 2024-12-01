@@ -47,7 +47,7 @@ GPUDev *init_gpu_dev(GPURequestedState *requested_state) {
   // dev->scanouts[0].y = 0;
   // dev->scanouts[0].resource_id = 0;
   dev->scanouts[0].current_cursor = NULL;
-  dev->scanouts[0].enable = true;
+  dev->enabled_scanout_bitmask |= (1 << 0); // 启用scanout 0
 
   // TODO: 多组requested_states(需要更改json解析)
   dev->requested_states[0].width = requested_state->width;
@@ -86,6 +86,13 @@ void virtio_gpu_close(VirtIODevice *vdev) {
   // 回收resource相关内存
   while (!TAILQ_EMPTY(&gdev->resource_list)) {
     GPUSimpleResource *temp = TAILQ_FIRST(&gdev->resource_list);
+    // TODO: free image
+    // if (temp->image) {
+    //   if (temp->image->data) {
+    //     free(temp->image->data);
+    //   }
+    //   free(temp->image);
+    // }
     TAILQ_REMOVE(&gdev->resource_list, temp, next);
     free(temp);
   }

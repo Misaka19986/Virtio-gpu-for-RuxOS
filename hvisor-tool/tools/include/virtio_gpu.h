@@ -2,7 +2,6 @@
 #define _HVISOR_VIRTIO_GPU_H
 #include "linux/types.h"
 #include "sys/queue.h"
-#include "uapi/linux/uio.h"
 #include "virtio.h"
 #include <linux/virtio_gpu.h>
 #include <stddef.h>
@@ -31,6 +30,7 @@
 
 // 支持的virtio features
 // 可选VIRTIO_RING_F_INDIRECT_DESC和VIRTIO_RING_F_EVENT_IDX
+// 待支持VIRTIO_GPU_F_EDID、VIRTIO_GPU_F_RESOURCE_UUID、VIRTIO_GPU_F_RESOURCE_BLOB、VIRTIO_GPU_F_VIRGL、VIRTIO_GPU_F_CONTEXT_INIT
 #define GPU_SUPPORTED_FEATURES ((1ULL << VIRTIO_F_VERSION_1))
 
 // 求最小值宏
@@ -56,26 +56,38 @@ typedef struct virtio_gpu_config GPUConfig;
 typedef struct virtio_gpu_ctrl_hdr GPUControlHeader;
 typedef struct virtio_gpu_update_cursor GPUUpdateCursor;
 
+// host内存中的image，用于输出到显示设备
+typedef struct virtio_gpu_simple_image {
+  uint32_t format;
+  uint32_t width, height;
+  uint32_t stride;
+  uint32_t *data;
+} GPUSimpleImage;
+
 // 渲染时存储在内存中的资源对象(图片等)
 typedef struct virtio_gpu_simple_resource {
   uint32_t resource_id;   // 资源id
   uint32_t width, height; // 资源的宽和高
   uint32_t format; // 资源的format，结合宽高计算存储资源所用的内存大小
-  uint64_t *addrs;   // ? qemu中使用，貌似与blob有关
+  // addrs为资源在guest的物理地址数组，因为zonex会直接映射到hvisor-tool的虚拟内存空间，因此暂时不需要该字段
+  // uint64_t *addrs;
   struct iovec *iov; // 用iov来存储资源
   unsigned int iov_cnt;
-  uint64_t hostmem; // 资源在host中所占的大小
+  uint64_t hostmem;         // 资源在host中所占的大小
+  uint32_t scanout_bitmask; // 标记resource被哪个scanout使用
+  GPUSimpleImage *image;
   TAILQ_ENTRY(virtio_gpu_simple_resource) next;
 } GPUSimpleResource;
 
 typedef struct virtio_gpu_framebuffer {
   // TODO: format格式
-  // format主要决定了每一个像素占多少字节，virtio_gpu_formats提供的都是4bytes大小的格式
+  // format主要决定了每一个像素占多少字节
+  // virtio_gpu_formats提供的都是4bytes per pixel大小的格式
   uint32_t format;        // virtio_gpu_formats
   uint32_t bytes_pp;      // 每像素(per pixel)的字节大小
   uint32_t width, height; // 帧缓存的宽和高
   uint32_t stride; // stride(步幅)指图像的每一行在内存中所占的字节数，stride *
-                   // height等于总字节数
+                   // height等于总字节数(hostmem)
   uint32_t offset;
 } GPUFrameBuffer;
 
@@ -95,7 +107,6 @@ typedef struct virtio_gpu_scanout {
   GPUUpdateCursor cursor;
   HvCursor *current_cursor;
   GPUFrameBuffer frame_buffer;
-  bool enable;
 } GPUScanout;
 
 // 由json指定的显示设备的设置
@@ -104,6 +115,7 @@ typedef struct virtio_gpu_requested_state {
   int x, y;
 } GPURequestedState;
 
+// GPU设备结构体
 typedef struct virtio_gpu_dev {
   GPUConfig config;
   // TODO: scanouts初始化
@@ -120,6 +132,8 @@ typedef struct virtio_gpu_dev {
   int scanouts_num;
   // virtio设备所占有的总内存
   uint64_t hostmem;
+  // 启用的scanout
+  int enabled_scanout_bitmask;
 } GPUDev;
 
 typedef struct virtio_gpu_control_cmd {
@@ -195,10 +209,9 @@ static inline size_t iov_to_buf(const struct iovec *iov, // NOLINT
 }
 
 // 从buffer填充iov，单次优化
-static inline size_t buf_to_iov(const struct iovec *iov,
-                                unsigned int iov_cnt, // NOLINT
-                                size_t offset, const void *buf,
-                                size_t bytes_need_copy) {
+static inline size_t buf_to_iov(const struct iovec *iov, // NOLINT
+                                unsigned int iov_cnt, size_t offset,
+                                const void *buf, size_t bytes_need_copy) {
   if (__builtin_constant_p(bytes_need_copy) && iov_cnt &&
       offset <= iov[0].iov_len && bytes_need_copy <= iov[0].iov_len - offset) {
     memcpy((char *)iov[0].iov_base + offset, buf, bytes_need_copy);
@@ -237,6 +250,13 @@ static void virtio_gpu_resource_create_2d(VirtIODevice *vdev, GPUCommand *gcmd);
 static GPUSimpleResource *virtio_gpu_find_resource(GPUDev *gdev,
                                                    uint32_t resource_id);
 
+// 检查指定id的resource是否已经绑定，如果是，则返回其指针
+// 否则，若id没有对应的resource，或者该resource没有绑定，则返回NULL
+static GPUSimpleResource *virtio_gpu_check_resource(VirtIODevice *vdev,
+                                                    uint32_t resource_id,
+                                                    const char *caller,
+                                                    uint32_t *error);
+
 // 计算resource在host所占用的内存大小
 static uint32_t calc_image_hostmem(int bits_per_pixel, uint32_t width,
                                    uint32_t height);
@@ -250,8 +270,21 @@ static void virtio_gpu_resource_unref(VirtIODevice *vdev, GPUCommand *gcmd);
 static void virtio_gpu_resource_flush(VirtIODevice *vdev, GPUCommand *gcmd);
 
 // 对应VIRTIO_GPU_CMD_SET_SCANOUT
-// 为一个输出设置scanout参数
+// 设置scanout的display参数，为scanout绑定resource
 static void virtio_gpu_set_scanout(VirtIODevice *vdev, GPUCommand *gcmd);
+
+// 根据参数具体设置scanout
+static bool virtio_gpu_do_set_scanout(VirtIODevice *vdev, uint32_t scanout_id,
+                                      GPUFrameBuffer *fb,
+                                      GPUSimpleResource *res,
+                                      struct virtio_gpu_rect *r,
+                                      uint32_t *error);
+
+// 更新scanout
+static void virtio_gpu_update_scanout(VirtIODevice *vdev, uint32_t scanout_id,
+                                      GPUFrameBuffer *fb,
+                                      GPUSimpleResource *res,
+                                      struct virtio_gpu_rect *r);
 
 // 对应VIRTIO_GPU_CMD_TRANSFER_TO_HOST_2D
 // 将在guest内存中的内容转移到host的resource中
@@ -259,15 +292,21 @@ static void virtio_gpu_transfer_to_host_2d(VirtIODevice *vdev,
                                            GPUCommand *gcmd);
 
 // 对应VIRTIO_GPU_CMD_RESOURCE_ATTACH_BACKING
-// 将一个guest中的内存区域(帧缓冲区)绑定到resource
+// 将多个guest中的内存区域绑定到resource(作为backing storage)
 static void virtio_gpu_resource_attach_backing(VirtIODevice *vdev,
                                                GPUCommand *gcmd);
 
 // 将guest内存映射到host的iov
 static int virtio_gpu_create_mapping_iov(VirtIODevice *vdev,
                                          uint32_t nr_entries, uint32_t offset,
-                                         GPUCommand *gcmd, uint64_t **addr,
+                                         GPUCommand *gcmd, /*uint64_t **addr,*/
                                          struct iovec **iov, uint32_t *niov);
+
+// ! reserved
+// 清除映射
+// static void virtio_gpu_cleanup_mapping_iov(VirtIODevice *vdev,
+//                                            struct iovec *iov, uint32_t
+//                                            iov_cnt);
 
 // 对应VIRTIO_GPU_CMD_RESOURCE_DETACH_BACKING
 // 从resource中解绑guest的内存区域
