@@ -1,12 +1,20 @@
 #include "virtio_gpu.h"
+#include "linux/types.h"
 #include "linux/virtio_gpu.h"
 #include "log.h"
 #include "sys/queue.h"
+#include "uapi/drm/drm_mode.h"
 #include "virtio.h"
+#include <drm/drm.h>
+#include <drm/drm_fourcc.h>
+#include <drm/drm_mode.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/mman.h>
+#include <xf86drm.h>
+#include <xf86drmMode.h>
 
 void virtio_gpu_ctrl_response(VirtIODevice *vdev, GPUCommand *gcmd,
                               GPUControlHeader *resp, size_t resp_len) {
@@ -111,7 +119,6 @@ void virtio_gpu_resource_create_2d(VirtIODevice *vdev, GPUCommand *gcmd) {
   res->scanout_bitmask = 0;
   res->iov = NULL;
   res->iov_cnt = 0;
-  res->image = NULL;
 
   // 计算resource所占用的内存大小
   // 默认只支持bpp为4 bytes大小的format
@@ -123,16 +130,6 @@ void virtio_gpu_resource_create_2d(VirtIODevice *vdev, GPUCommand *gcmd) {
     free(res);
     return;
   }
-
-  // TODO: alloc image
-
-  // if (!res->image) {
-  //   log_error("%s failed to create image for resource %d",
-  //             create_2d.resource_id);
-  //   free(res);
-  //   gcmd->error = VIRTIO_GPU_RESP_ERR_OUT_OF_MEMORY;
-  //   return;
-  // }
 
   // 内存足够，将res加入virtio gpu下管理
   TAILQ_INSERT_HEAD(&gdev->resource_list, res, next);
@@ -173,8 +170,7 @@ GPUSimpleResource *virtio_gpu_check_resource(VirtIODevice *vdev,
     return NULL;
   }
 
-  // TODO: image
-  if (!res->iov || res->hostmem <= 0 /*|| !res->image*/) {
+  if (!res->iov || res->hostmem <= 0) {
     log_error("%s found resource %d has no backing storage", caller,
               resource_id);
     if (error) {
@@ -202,8 +198,118 @@ void virtio_gpu_resource_unref(VirtIODevice *vdev, GPUCommand *gcmd) {
 void virtio_gpu_resource_flush(VirtIODevice *vdev, GPUCommand *gcmd) {
   log_debug("entering %s", __func__);
 
-  // TODO: flush image to device
+  GPUDev *gdev = vdev->dev;
+
+  GPUSimpleResource *res;
+  GPUScanout *scanout;
+  struct virtio_gpu_resource_flush resource_flush;
+
+  VIRTIO_GPU_FILL_CMD(gcmd->resp_iov, gcmd->resp_iov_cnt, resource_flush);
+
+  res = virtio_gpu_check_resource(vdev, resource_flush.resource_id, __func__,
+                                  &gcmd->error);
+  if (!res) {
+    return;
+  }
+
+  if (resource_flush.r.x > res->width || resource_flush.r.y > res->height ||
+      resource_flush.r.width > res->width ||
+      resource_flush.r.height > res->height ||
+      resource_flush.r.x + resource_flush.r.width > res->width ||
+      resource_flush.r.y + resource_flush.r.height > res->height) {
+    log_error("%s flush bounds outside resource %d bounds, (%d, %d) + %d, %d "
+              "vs %d, %d",
+              __func__, resource_flush.resource_id, resource_flush.r.x,
+              resource_flush.r.y, resource_flush.r.width,
+              resource_flush.r.height, res->width, res->height);
+    gcmd->error = VIRTIO_GPU_RESP_ERR_INVALID_PARAMETER;
+    return;
+  }
+
+  for (int i = 0; i < HVISOR_VIRTIO_GPU_MAX_SCANOUTS; ++i) {
+    // 遍历resource所对应的scanout
+    if (!(res->scanout_bitmask & (1 << i))) {
+      continue;
+    }
+    scanout = &gdev->scanouts[i];
+
+    if (!scanout->frame_buffer.enabled) {
+      // 若scanout的frame_buffer还没有初始化过
+      GPUFrameBuffer *fb = &scanout->frame_buffer;
+
+      struct drm_mode_create_dumb dumb = {0};
+      dumb.width = fb->width;
+      dumb.height = fb->height;
+      dumb.bpp = fb->bytes_pp * 8;
+      uint32_t offsets[4] = {0};
+
+      if (drmIoctl(scanout->card0_fd, DRM_IOCTL_MODE_CREATE_DUMB, &dumb) < 0) {
+        log_error("%s failed to create a drm dumb", __func__);
+        gcmd->error = VIRTIO_GPU_RESP_ERR_UNSPEC;
+        return;
+      } // 创建一个dumb对象
+
+      uint32_t drm_format = VIRTIO_GPU_FORMAT_TO_DRM_FORMAT(fb->format);
+
+      if (!drm_format) {
+        log_error("%s find framebuffer has an unknown format", __func__);
+        gcmd->error = VIRTIO_GPU_RESP_ERR_UNSPEC;
+        return;
+      }
+
+      drmModeAddFB2(scanout->card0_fd, dumb.width, dumb.height, drm_format,
+                    &dumb.handle, &dumb.pitch, offsets, &fb->framebuffer_id, 0);
+
+      log_debug("%s create a drm_framebuffer with width: %d, height: %d, "
+                "format: %d, handle: %d, fb_id: %d",
+                __func__, dumb.width, dumb.height, drm_format, dumb.handle,
+                fb->framebuffer_id);
+
+      struct drm_mode_map_dumb map = {0};
+      map.handle = dumb.handle;
+      drmIoctl(scanout->card0_fd, DRM_IOCTL_MODE_MAP_DUMB,
+               &map); // 将显存与framebuffer绑定，根据handle获得offset
+
+      void *vaddr = mmap(0, dumb.size, PROT_READ | PROT_WRITE, MAP_SHARED,
+                         scanout->card0_fd, map.offset);
+
+      uint32_t format = res->format;
+      int bpp = 32;
+      uint32_t stride = res->hostmem / res->height;
+      uint32_t src_offset, dst_offset;
+
+      // 从res拷贝到缓冲区
+      if (res->transfer_rect.x || res->transfer_rect.width != res->width) {
+        for (int h = 0; h < res->transfer_rect.height; h++) {
+          src_offset = res->transfer_offset + stride * h;
+          dst_offset = (res->transfer_rect.y + h) * stride +
+                       (res->transfer_rect.x * bpp);
+
+          iov_to_buf(res->iov, res->iov_cnt, src_offset, vaddr + dst_offset,
+                     res->transfer_rect.width * bpp);
+        }
+      } else {
+        src_offset = res->transfer_offset;
+        dst_offset = res->transfer_rect.y * stride + res->transfer_rect.x * bpp;
+
+        iov_to_buf(res->iov, res->iov_cnt, src_offset, vaddr + dst_offset,
+                   stride * res->transfer_rect.height);
+      }
+
+      // TODO: 控制CRTC输出
+      drmModeModeInfo mode = scanout->connector->modes[0];
+      drmModeSetCrtc(scanout->card0_fd, scanout->crtc->crtc_id,
+                     fb->framebuffer_id, 0, 0,
+                     &scanout->connector->connector_id, 1, &mode);
+    } else {
+      // TODO: 已经分配过一次framebuffer，则需要重新分配
+      // TODO: 包括munmap，以及调用drm的销毁函数
+      // TODO: 将没分配过的情况封装
+    }
+  }
 }
+
+void virtio_gpu_create_drm_framebuffer_and_flush() {}
 
 void virtio_gpu_set_scanout(VirtIODevice *vdev, GPUCommand *gcmd) {
   log_debug("entering %s", __func__);
@@ -238,13 +344,13 @@ void virtio_gpu_set_scanout(VirtIODevice *vdev, GPUCommand *gcmd) {
   log_debug("%s setting scanout %d with resource %d", __func__,
             set_scanout.scanout_id, set_scanout.resource_id);
 
-  // TODO: image
   fb.format = res->format;
   fb.bytes_pp = 4; // format都是32bits pp，即4bytes pp
   fb.width = res->width;
   fb.height = res->height;
   fb.stride = res->hostmem / res->height; // hostmem = height * stride
   fb.offset = set_scanout.r.x * fb.bytes_pp + set_scanout.r.y * fb.stride;
+  fb.enabled = false;
 
   // 进入真正的设置函数
   virtio_gpu_do_set_scanout(vdev, set_scanout.scanout_id, &fb, res,
@@ -342,12 +448,27 @@ void virtio_gpu_transfer_to_host_2d(VirtIODevice *vdev, GPUCommand *gcmd) {
             __func__, transfer_2d.r.x, transfer_2d.r.y, transfer_2d.r.width,
             transfer_2d.r.height, res->resource_id, res->width, res->height);
 
-  uint32_t format = res->format;
-  int bpp = 32;
-  uint32_t stride = res->hostmem / res->height;
+  // uint32_t format = res->format;
+  // int bpp = 32;
+  // uint32_t stride = res->hostmem / res->height;
 
-  // TODO: 写resource的iov到image
   // iov_to_buf
+  // if (transfer_2d.r.x || transfer_2d.r.width != res->width) {
+  //   for (int h = 0; h < transfer_2d.r.height; h++) {
+  //     src_offset = transfer_2d.offset + stride * h;
+  //     dst_offset = (transfer_2d.r.y + h) * stride + (transfer_2d.r.x * bpp);
+  //   }
+  // } else {
+  //   src_offset = transfer_2d.offset;
+  //   dst_offset = transfer_2d.r.y * stride + transfer_2d.r.x * bpp;
+  // }
+
+  // 保留transfer的信息，到flush时再真正拷贝
+  res->transfer_rect.x = transfer_2d.r.x;
+  res->transfer_rect.y = transfer_2d.r.y;
+  res->transfer_rect.width = transfer_2d.r.width;
+  res->transfer_rect.height = transfer_2d.r.height;
+  res->transfer_offset = transfer_2d.offset;
 }
 
 void virtio_gpu_resource_attach_backing(VirtIODevice *vdev, GPUCommand *gcmd) {
@@ -456,7 +577,7 @@ int virtio_gpu_create_mapping_iov(VirtIODevice *vdev, uint32_t nr_entries,
     log_debug("guest addr %x map to %x with size %d", e_addr,
               (*iov)[v].iov_base, (*iov)[v].iov_len);
     // if (addr) {
-    //   (*addr)[v] = a;
+    //   (*addr)[v] = e_addr;
     // }
 
     // 考虑到后期更改时，也许zonex到zone0的映射并不是直接的，而是通过dma等方式重新分配

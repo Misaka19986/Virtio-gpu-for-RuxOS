@@ -3,6 +3,7 @@
 #include "linux/types.h"
 #include "sys/queue.h"
 #include "virtio.h"
+#include "xf86drmMode.h"
 #include <linux/virtio_gpu.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -36,6 +37,18 @@
 // 求最小值宏
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 
+// virtio_gpu_formats和drm格式转换
+#define VIRTIO_GPU_FORMAT_TO_DRM_FORMAT(format)                                \
+  ((format == VIRTIO_GPU_FORMAT_X8R8G8B8_UNORM)   ? DRM_FORMAT_XRGB8888        \
+   : (format == VIRTIO_GPU_FORMAT_X8B8G8R8_UNORM) ? DRM_FORMAT_XBGR8888        \
+   : (format == VIRTIO_GPU_FORMAT_R8G8B8X8_UNORM) ? DRM_FORMAT_RGBX8888        \
+   : (format == VIRTIO_GPU_FORMAT_B8G8R8X8_UNORM) ? DRM_FORMAT_BGRX8888        \
+   : (format == VIRTIO_GPU_FORMAT_A8R8G8B8_UNORM) ? DRM_FORMAT_ARGB8888        \
+   : (format == VIRTIO_GPU_FORMAT_A8B8G8R8_UNORM) ? DRM_FORMAT_ABGR8888        \
+   : (format == VIRTIO_GPU_FORMAT_R8G8B8A8_UNORM) ? DRM_FORMAT_RGBA8888        \
+   : (format == VIRTIO_GPU_FORMAT_B8G8R8A8_UNORM) ? DRM_FORMAT_BGRA8888        \
+                                                  : 0 /* 未知格式 */)
+
 /*********************************************************************
     结构体
  */
@@ -56,15 +69,8 @@ typedef struct virtio_gpu_config GPUConfig;
 typedef struct virtio_gpu_ctrl_hdr GPUControlHeader;
 typedef struct virtio_gpu_update_cursor GPUUpdateCursor;
 
-// host内存中的image，用于输出到显示设备
-typedef struct virtio_gpu_simple_image {
-  uint32_t format;
-  uint32_t width, height;
-  uint32_t stride;
-  uint32_t *data;
-} GPUSimpleImage;
-
 // 渲染时存储在内存中的资源对象(图片等)
+// 在使用时，需要从iov转换成一个drm_mode_create_dumb对象来输出
 typedef struct virtio_gpu_simple_resource {
   uint32_t resource_id;   // 资源id
   uint32_t width, height; // 资源的宽和高
@@ -73,13 +79,17 @@ typedef struct virtio_gpu_simple_resource {
   // uint64_t *addrs;
   struct iovec *iov; // 用iov来存储资源
   unsigned int iov_cnt;
-  uint64_t hostmem;         // 资源在host中所占的大小
-  uint32_t scanout_bitmask; // 标记resource被哪个scanout使用
-  GPUSimpleImage *image;
+  uint64_t hostmem;                     // 资源在host中所占的大小
+  uint32_t scanout_bitmask;             // 标记resource被哪个scanout使用
+  struct virtio_gpu_rect transfer_rect; // transfer_to_2d中，决定最终要flush
+                                        // guest内存中的图像的哪一部分
+  uint64_t transfer_offset;
   TAILQ_ENTRY(virtio_gpu_simple_resource) next;
 } GPUSimpleResource;
 
 typedef struct virtio_gpu_framebuffer {
+  // TODO: 双缓冲区
+  uint32_t framebuffer_id; // framebuffer的id
   // TODO: format格式
   // format主要决定了每一个像素占多少字节
   // virtio_gpu_formats提供的都是4bytes per pixel大小的格式
@@ -89,6 +99,10 @@ typedef struct virtio_gpu_framebuffer {
   uint32_t stride; // stride(步幅)指图像的每一行在内存中所占的字节数，stride *
                    // height等于总字节数(hostmem)
   uint32_t offset;
+  // drm相关
+  uint32_t drm_dumb_handle; // 指向drm帧缓冲区的handle
+  void *fb_addr;
+  bool enabled;
 } GPUFrameBuffer;
 
 // 32-bit RGBA
@@ -107,6 +121,12 @@ typedef struct virtio_gpu_scanout {
   GPUUpdateCursor cursor;
   HvCursor *current_cursor;
   GPUFrameBuffer frame_buffer;
+  // 使用的输出card
+  int card0_fd;
+  // drm相关
+  drmModeCrtc *crtc;
+  drmModeEncoder *encoder;
+  drmModeConnector *connector;
 } GPUScanout;
 
 // 由json指定的显示设备的设置
@@ -134,8 +154,6 @@ typedef struct virtio_gpu_dev {
   uint64_t hostmem;
   // 启用的scanout
   int enabled_scanout_bitmask;
-  // 使用的输出card
-  int card0_fd;
 } GPUDev;
 
 typedef struct virtio_gpu_control_cmd {
@@ -268,6 +286,10 @@ void virtio_gpu_resource_unref(VirtIODevice *vdev, GPUCommand *gcmd);
 // 对应VIRTIO_GPU_CMD_RESOURCE_FLUSH
 // flush一个已经链接到scanout的resource
 void virtio_gpu_resource_flush(VirtIODevice *vdev, GPUCommand *gcmd);
+
+// 创建一个drm_framebuffer并将resource的内容拷贝到该framebuffer
+// 之后flush
+void virtio_gpu_create_drm_framebuffer_and_flush();
 
 // 对应VIRTIO_GPU_CMD_SET_SCANOUT
 // 设置scanout的display参数，为scanout绑定resource

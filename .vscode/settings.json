@@ -18,6 +18,9 @@
 	"rust-analyzer.cargo.features": [
 		"platform_qemu"
 	],
+	// "rust-analyzer.server.extraEnv": {
+	// 	"RA_LOG": "info"
+	// },
 	/* clangd */
 	"clangd.arguments": [
 		"--compile-commands-dir=${workspaceFolder}/build",
