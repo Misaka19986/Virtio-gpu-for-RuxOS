@@ -2,13 +2,13 @@
 #include "sys/queue.h"
 #include "virtio.h"
 #include "virtio_gpu.h"
-#include <drm/drm.h>
-#include <drm/drm_mode.h>
 #include <fcntl.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
+#include <xf86drm.h>
+#include <xf86drmMode.h>
 
 GPUDev *init_gpu_dev(GPURequestedState *requested_state) {
   log_info("initializing GPUDev");
@@ -88,8 +88,6 @@ int virtio_gpu_init(VirtIODevice *vdev) {
 
   // 获取drm资源
   // 需要获得设备的连接器(connector)和显示控制器(CRTC)
-  drmModeRes *res
-
 
   vdev->virtio_close = virtio_gpu_close;
   return 0;

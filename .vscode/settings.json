@@ -35,6 +35,7 @@
 		"-I/usr/local/bin/linux/include",
 		"-I/usr/aarch64-linux-gnu/include",
 		"-I/usr/local/bin/linux/arch/arm64/include",
+		"-I/usr/local/bin/libdrm-2.4.100/install/include",
 		"-DARM64",
 		"-D__KERNEL__",
 		"-DMODULE"
