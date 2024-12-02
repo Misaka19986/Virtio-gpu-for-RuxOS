@@ -2,9 +2,13 @@
 #include "sys/queue.h"
 #include "virtio.h"
 #include "virtio_gpu.h"
+#include <drm/drm.h>
+#include <drm/drm_mode.h>
+#include <fcntl.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/ioctl.h>
 
 GPUDev *init_gpu_dev(GPURequestedState *requested_state) {
   log_info("initializing GPUDev");
@@ -65,11 +69,28 @@ GPUDev *init_gpu_dev(GPURequestedState *requested_state) {
   // 初始化内存计数
   dev->hostmem = 0;
 
+  // 初始化card0
+  dev->card0_fd = 0;
+
   return dev;
 }
 
 int virtio_gpu_init(VirtIODevice *vdev) {
   // TODO: 显示设备初始化
+  GPUDev *gdev = vdev->dev;
+
+  // 打开card0
+  gdev->card0_fd = open("/dev/dri/card0", O_RDWR);
+  if (gdev->card0_fd < 0) {
+    log_error("%s failed to open /dev/dri/card0", __func__);
+    return -1;
+  }
+
+  // 获取drm资源
+  // 需要获得设备的连接器(connector)和显示控制器(CRTC)
+  drmModeRes *res
+
+
   vdev->virtio_close = virtio_gpu_close;
   return 0;
 }
@@ -182,7 +203,7 @@ int virtio_gpu_handle_single_request(VirtIODevice *vdev, VirtQueue *vq) {
     return 0;
   }
 
-  // debug
+  // !debug
   for (int i = 0; i < desc_processed_num; ++i) {
     char s[50] = "";
 

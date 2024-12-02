@@ -38,9 +38,9 @@
         },
         {
             "type": "virtio",
-            "physical_start": "0xa003400",
-            "virtual_start": "0xa003400",
-            "size": "0x200"
+            "physical_start": "0xa000000",
+            "virtual_start": "0xa000000",
+            "size": "0x4000"
         }
     ],
     "interrupts": [

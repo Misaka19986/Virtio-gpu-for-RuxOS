@@ -134,6 +134,8 @@ typedef struct virtio_gpu_dev {
   uint64_t hostmem;
   // 启用的scanout
   int enabled_scanout_bitmask;
+  // 使用的输出card
+  int card0_fd;
 } GPUDev;
 
 typedef struct virtio_gpu_control_cmd {
@@ -225,98 +227,89 @@ static inline size_t buf_to_iov(const struct iovec *iov, // NOLINT
   virtio_gpu.c
  */
 // 返回有数据的响应
-static void virtio_gpu_ctrl_response(VirtIODevice *vdev, GPUCommand *gcmd,
-                                     GPUControlHeader *resp, size_t resp_len);
+void virtio_gpu_ctrl_response(VirtIODevice *vdev, GPUCommand *gcmd,
+                              GPUControlHeader *resp, size_t resp_len);
 
 // 返回无数据的响应
-static void virtio_gpu_ctrl_response_nodata(VirtIODevice *vdev,
-                                            GPUCommand *gcmd,
-                                            enum virtio_gpu_ctrl_type type);
+void virtio_gpu_ctrl_response_nodata(VirtIODevice *vdev, GPUCommand *gcmd,
+                                     enum virtio_gpu_ctrl_type type);
 
 // 对应VIRTIO_GPU_CMD_GET_DISPLAY_INFO
 // 返回当前的输出配置
-static void virtio_gpu_get_display_info(VirtIODevice *vdev, GPUCommand *gcmd);
+void virtio_gpu_get_display_info(VirtIODevice *vdev, GPUCommand *gcmd);
 
 // 对应VIRTIO_GPU_CMD_GET_EDID
 // 返回当前的EDID信息
-static void virtio_gpu_get_edid(VirtIODevice *vdev, GPUCommand *gcmd);
+void virtio_gpu_get_edid(VirtIODevice *vdev, GPUCommand *gcmd);
 
 // 对应VIRTIO_GPU_CMD_RESOURCE_CREATE_2D
 // 在host上以guest给定的id，width，height，format创建一个2D资源
-static void virtio_gpu_resource_create_2d(VirtIODevice *vdev, GPUCommand *gcmd);
+void virtio_gpu_resource_create_2d(VirtIODevice *vdev, GPUCommand *gcmd);
 
 // 查询给定的virtio gpu设备是否有id为resource_id的资源
 // 若没有，则返回NULL
-static GPUSimpleResource *virtio_gpu_find_resource(GPUDev *gdev,
-                                                   uint32_t resource_id);
+GPUSimpleResource *virtio_gpu_find_resource(GPUDev *gdev, uint32_t resource_id);
 
 // 检查指定id的resource是否已经绑定，如果是，则返回其指针
 // 否则，若id没有对应的resource，或者该resource没有绑定，则返回NULL
-static GPUSimpleResource *virtio_gpu_check_resource(VirtIODevice *vdev,
-                                                    uint32_t resource_id,
-                                                    const char *caller,
-                                                    uint32_t *error);
+GPUSimpleResource *virtio_gpu_check_resource(VirtIODevice *vdev,
+                                             uint32_t resource_id,
+                                             const char *caller,
+                                             uint32_t *error);
 
 // 计算resource在host所占用的内存大小
-static uint32_t calc_image_hostmem(int bits_per_pixel, uint32_t width,
-                                   uint32_t height);
+uint32_t calc_image_hostmem(int bits_per_pixel, uint32_t width,
+                            uint32_t height);
 
 // 对应VIRTIO_GPU_CMD_RESOURCE_UNREF
 // 销毁一个resource
-static void virtio_gpu_resource_unref(VirtIODevice *vdev, GPUCommand *gcmd);
+void virtio_gpu_resource_unref(VirtIODevice *vdev, GPUCommand *gcmd);
 
 // 对应VIRTIO_GPU_CMD_RESOURCE_FLUSH
 // flush一个已经链接到scanout的resource
-static void virtio_gpu_resource_flush(VirtIODevice *vdev, GPUCommand *gcmd);
+void virtio_gpu_resource_flush(VirtIODevice *vdev, GPUCommand *gcmd);
 
 // 对应VIRTIO_GPU_CMD_SET_SCANOUT
 // 设置scanout的display参数，为scanout绑定resource
-static void virtio_gpu_set_scanout(VirtIODevice *vdev, GPUCommand *gcmd);
+void virtio_gpu_set_scanout(VirtIODevice *vdev, GPUCommand *gcmd);
 
 // 根据参数具体设置scanout
-static bool virtio_gpu_do_set_scanout(VirtIODevice *vdev, uint32_t scanout_id,
-                                      GPUFrameBuffer *fb,
-                                      GPUSimpleResource *res,
-                                      struct virtio_gpu_rect *r,
-                                      uint32_t *error);
+bool virtio_gpu_do_set_scanout(VirtIODevice *vdev, uint32_t scanout_id,
+                               GPUFrameBuffer *fb, GPUSimpleResource *res,
+                               struct virtio_gpu_rect *r, uint32_t *error);
 
 // 更新scanout
-static void virtio_gpu_update_scanout(VirtIODevice *vdev, uint32_t scanout_id,
-                                      GPUFrameBuffer *fb,
-                                      GPUSimpleResource *res,
-                                      struct virtio_gpu_rect *r);
+void virtio_gpu_update_scanout(VirtIODevice *vdev, uint32_t scanout_id,
+                               GPUFrameBuffer *fb, GPUSimpleResource *res,
+                               struct virtio_gpu_rect *r);
 
 // 对应VIRTIO_GPU_CMD_TRANSFER_TO_HOST_2D
 // 将在guest内存中的内容转移到host的resource中
-static void virtio_gpu_transfer_to_host_2d(VirtIODevice *vdev,
-                                           GPUCommand *gcmd);
+void virtio_gpu_transfer_to_host_2d(VirtIODevice *vdev, GPUCommand *gcmd);
 
 // 对应VIRTIO_GPU_CMD_RESOURCE_ATTACH_BACKING
 // 将多个guest中的内存区域绑定到resource(作为backing storage)
-static void virtio_gpu_resource_attach_backing(VirtIODevice *vdev,
-                                               GPUCommand *gcmd);
+void virtio_gpu_resource_attach_backing(VirtIODevice *vdev, GPUCommand *gcmd);
 
 // 将guest内存映射到host的iov
-static int virtio_gpu_create_mapping_iov(VirtIODevice *vdev,
-                                         uint32_t nr_entries, uint32_t offset,
-                                         GPUCommand *gcmd, /*uint64_t **addr,*/
-                                         struct iovec **iov, uint32_t *niov);
+int virtio_gpu_create_mapping_iov(VirtIODevice *vdev, uint32_t nr_entries,
+                                  uint32_t offset,
+                                  GPUCommand *gcmd, /*uint64_t **addr,*/
+                                  struct iovec **iov, uint32_t *niov);
 
 // ! reserved
 // 清除映射
-// static void virtio_gpu_cleanup_mapping_iov(VirtIODevice *vdev,
+//  void virtio_gpu_cleanup_mapping_iov(VirtIODevice *vdev,
 //                                            struct iovec *iov, uint32_t
 //                                            iov_cnt);
 
 // 对应VIRTIO_GPU_CMD_RESOURCE_DETACH_BACKING
 // 从resource中解绑guest的内存区域
-static void virtio_gpu_resource_detach_backing(VirtIODevice *vdev,
-                                               GPUCommand *gcmd);
+void virtio_gpu_resource_detach_backing(VirtIODevice *vdev, GPUCommand *gcmd);
 
 // 根据control header处理请求
-static void virtio_gpu_simple_process_cmd(struct iovec *iov,
-                                          const unsigned int iov_cnt,
-                                          uint16_t resp_idx,
-                                          VirtIODevice *vdev);
+void virtio_gpu_simple_process_cmd(struct iovec *iov,
+                                   const unsigned int iov_cnt,
+                                   uint16_t resp_idx, VirtIODevice *vdev);
 
 #endif /* _HVISOR_VIRTIO_GPU_H */

@@ -71,8 +71,8 @@ elif [ "$TARGET" = "all" ]; then
     cp $KERNEL/Image $ZONEBASE
     # cp $VIRTDISK/rootfs2.ext4 $ZONEBASE
     cp $DEVICETREE/qemu-ruxos.dtb $ZONEBASE
-    cp $KERNEL/helloworld_aarch64-qemu-virt.bin $ZONEBASE
-    cp $KERNEL/basic_painting_aarch64-qemu-virt.bin $ZONEBASE
+    cp $RUXOS/apps/c/helloworld/helloworld_aarch64-qemu-virt.bin $ZONEBASE
+    cp $RUXOS/apps/display/basic_painting/basic_painting_aarch64-qemu-virt.bin $ZONEBASE
 fi
 
 echo "DONE" 

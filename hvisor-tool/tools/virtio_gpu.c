@@ -8,8 +8,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-static void virtio_gpu_ctrl_response(VirtIODevice *vdev, GPUCommand *gcmd,
-                                     GPUControlHeader *resp, size_t resp_len) {
+void virtio_gpu_ctrl_response(VirtIODevice *vdev, GPUCommand *gcmd,
+                              GPUControlHeader *resp, size_t resp_len) {
   log_debug("sending response");
   // 因为每个response结构体的头部都是GPUControlHeader，因此其地址就是response结构体的地址
 
@@ -35,9 +35,8 @@ static void virtio_gpu_ctrl_response(VirtIODevice *vdev, GPUCommand *gcmd,
   gcmd->finished = true;
 }
 
-static void virtio_gpu_ctrl_response_nodata(VirtIODevice *vdev,
-                                            GPUCommand *gcmd,
-                                            enum virtio_gpu_ctrl_type type) {
+void virtio_gpu_ctrl_response_nodata(VirtIODevice *vdev, GPUCommand *gcmd,
+                                     enum virtio_gpu_ctrl_type type) {
   log_debug("entering %s", __func__);
 
   GPUControlHeader resp;
@@ -47,7 +46,7 @@ static void virtio_gpu_ctrl_response_nodata(VirtIODevice *vdev,
   virtio_gpu_ctrl_response(vdev, gcmd, &resp, sizeof(resp));
 }
 
-static void virtio_gpu_get_display_info(VirtIODevice *vdev, GPUCommand *gcmd) {
+void virtio_gpu_get_display_info(VirtIODevice *vdev, GPUCommand *gcmd) {
   log_debug("entering %s", __func__);
 
   struct virtio_gpu_resp_display_info display_info;
@@ -71,13 +70,12 @@ static void virtio_gpu_get_display_info(VirtIODevice *vdev, GPUCommand *gcmd) {
   virtio_gpu_ctrl_response(vdev, gcmd, &display_info.hdr, sizeof(display_info));
 }
 
-static void virtio_gpu_get_edid(VirtIODevice *vdev, GPUCommand *gcmd) {
+void virtio_gpu_get_edid(VirtIODevice *vdev, GPUCommand *gcmd) {
   log_debug("entering %s", __func__);
   // TODO
 }
 
-static void virtio_gpu_resource_create_2d(VirtIODevice *vdev,
-                                          GPUCommand *gcmd) {
+void virtio_gpu_resource_create_2d(VirtIODevice *vdev, GPUCommand *gcmd) {
   log_debug("entering %s", __func__);
 
   GPUSimpleResource *res;
@@ -141,15 +139,15 @@ static void virtio_gpu_resource_create_2d(VirtIODevice *vdev,
   gdev->hostmem += res->hostmem;
 
   log_debug("add a resource %d to gpu dev of zone %d, width: %d height: %d "
-            "format: %d mem: %d host-hostmem: %d",
+            "format: %d mem: %d bytes host-hostmem: %d bytes",
             res->resource_id, vdev->zone_id, res->width, res->height,
             res->format, res->hostmem, gdev->hostmem);
 
   return;
 }
 
-static GPUSimpleResource *virtio_gpu_find_resource(GPUDev *gdev,
-                                                   uint32_t resource_id) {
+GPUSimpleResource *virtio_gpu_find_resource(GPUDev *gdev,
+                                            uint32_t resource_id) {
   GPUSimpleResource *temp_res;
   TAILQ_FOREACH(temp_res, &gdev->resource_list, next) {
     if (temp_res->resource_id == resource_id) {
@@ -159,10 +157,10 @@ static GPUSimpleResource *virtio_gpu_find_resource(GPUDev *gdev,
   return NULL;
 }
 
-static GPUSimpleResource *virtio_gpu_check_resource(VirtIODevice *vdev,
-                                                    uint32_t resource_id,
-                                                    const char *caller,
-                                                    uint32_t *error) {
+GPUSimpleResource *virtio_gpu_check_resource(VirtIODevice *vdev,
+                                             uint32_t resource_id,
+                                             const char *caller,
+                                             uint32_t *error) {
   GPUSimpleResource *res;
   GPUDev *gdev = vdev->dev;
 
@@ -188,8 +186,8 @@ static GPUSimpleResource *virtio_gpu_check_resource(VirtIODevice *vdev,
   return res;
 }
 
-static uint32_t calc_image_hostmem(int bits_per_pixel, uint32_t width,
-                                   uint32_t height) {
+uint32_t calc_image_hostmem(int bits_per_pixel, uint32_t width,
+                            uint32_t height) {
   // 0x1f = 31, >> 5等价于除32，即将每行的bits数对齐到4 bytes的倍数
   // 最后乘sizeof(uint32)获得字节数
   int stride = ((width * bits_per_pixel + 0x1f) >> 5) * sizeof(uint32_t);
@@ -197,17 +195,17 @@ static uint32_t calc_image_hostmem(int bits_per_pixel, uint32_t width,
   return height * stride;
 }
 
-static void virtio_gpu_resource_unref(VirtIODevice *vdev, GPUCommand *gcmd) {
+void virtio_gpu_resource_unref(VirtIODevice *vdev, GPUCommand *gcmd) {
   log_debug("entering %s", __func__);
 }
 
-static void virtio_gpu_resource_flush(VirtIODevice *vdev, GPUCommand *gcmd) {
+void virtio_gpu_resource_flush(VirtIODevice *vdev, GPUCommand *gcmd) {
   log_debug("entering %s", __func__);
 
   // TODO: flush image to device
 }
 
-static void virtio_gpu_set_scanout(VirtIODevice *vdev, GPUCommand *gcmd) {
+void virtio_gpu_set_scanout(VirtIODevice *vdev, GPUCommand *gcmd) {
   log_debug("entering %s", __func__);
 
   GPUDev *gdev = vdev->dev;
@@ -253,11 +251,9 @@ static void virtio_gpu_set_scanout(VirtIODevice *vdev, GPUCommand *gcmd) {
                             &set_scanout.r, &gcmd->error);
 }
 
-static bool virtio_gpu_do_set_scanout(VirtIODevice *vdev, uint32_t scanout_id,
-                                      GPUFrameBuffer *fb,
-                                      GPUSimpleResource *res,
-                                      struct virtio_gpu_rect *r,
-                                      uint32_t *error) {
+bool virtio_gpu_do_set_scanout(VirtIODevice *vdev, uint32_t scanout_id,
+                               GPUFrameBuffer *fb, GPUSimpleResource *res,
+                               struct virtio_gpu_rect *r, uint32_t *error) {
   GPUDev *gdev = vdev->dev;
   GPUScanout *scanout;
 
@@ -285,10 +281,9 @@ static bool virtio_gpu_do_set_scanout(VirtIODevice *vdev, uint32_t scanout_id,
   return true;
 }
 
-static void virtio_gpu_update_scanout(VirtIODevice *vdev, uint32_t scanout_id,
-                                      GPUFrameBuffer *fb,
-                                      GPUSimpleResource *res,
-                                      struct virtio_gpu_rect *r) {
+void virtio_gpu_update_scanout(VirtIODevice *vdev, uint32_t scanout_id,
+                               GPUFrameBuffer *fb, GPUSimpleResource *res,
+                               struct virtio_gpu_rect *r) {
   GPUDev *gdev = vdev->dev;
   GPUSimpleResource *origin_res;
   GPUScanout *scanout;
@@ -313,8 +308,7 @@ static void virtio_gpu_update_scanout(VirtIODevice *vdev, uint32_t scanout_id,
   scanout->frame_buffer = *fb;
 }
 
-static void virtio_gpu_transfer_to_host_2d(VirtIODevice *vdev,
-                                           GPUCommand *gcmd) {
+void virtio_gpu_transfer_to_host_2d(VirtIODevice *vdev, GPUCommand *gcmd) {
   log_debug("entering %s", __func__);
 
   GPUDev *gdev = vdev->dev;
@@ -356,8 +350,7 @@ static void virtio_gpu_transfer_to_host_2d(VirtIODevice *vdev,
   // iov_to_buf
 }
 
-static void virtio_gpu_resource_attach_backing(VirtIODevice *vdev,
-                                               GPUCommand *gcmd) {
+void virtio_gpu_resource_attach_backing(VirtIODevice *vdev, GPUCommand *gcmd) {
   log_debug("entering %s", __func__);
 
   GPUSimpleResource *res;
@@ -395,10 +388,10 @@ static void virtio_gpu_resource_attach_backing(VirtIODevice *vdev,
   }
 }
 
-static int virtio_gpu_create_mapping_iov(VirtIODevice *vdev,
-                                         uint32_t nr_entries, uint32_t offset,
-                                         GPUCommand *gcmd, /*uint64_t **addr,*/
-                                         struct iovec **iov, uint32_t *niov) {
+int virtio_gpu_create_mapping_iov(VirtIODevice *vdev, uint32_t nr_entries,
+                                  uint32_t offset,
+                                  GPUCommand *gcmd, /*uint64_t **addr,*/
+                                  struct iovec **iov, uint32_t *niov) {
   log_debug("entering %s", __func__);
   GPUDev *gdev = vdev->dev;
 
@@ -478,15 +471,13 @@ static int virtio_gpu_create_mapping_iov(VirtIODevice *vdev,
   return 0;
 }
 
-static void virtio_gpu_resource_detach_backing(VirtIODevice *vdev,
-                                               GPUCommand *gcmd) {
+void virtio_gpu_resource_detach_backing(VirtIODevice *vdev, GPUCommand *gcmd) {
   log_debug("entering %s", __func__);
 }
 
-static void virtio_gpu_simple_process_cmd(struct iovec *iov,
-                                          const unsigned int iov_cnt,
-                                          uint16_t resp_idx,
-                                          VirtIODevice *vdev) {
+void virtio_gpu_simple_process_cmd(struct iovec *iov,
+                                   const unsigned int iov_cnt,
+                                   uint16_t resp_idx, VirtIODevice *vdev) {
   log_debug("------ entering %s ------", __func__);
 
   GPUCommand gcmd;
