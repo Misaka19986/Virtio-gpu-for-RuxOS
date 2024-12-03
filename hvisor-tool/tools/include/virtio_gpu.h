@@ -3,10 +3,12 @@
 #include "linux/types.h"
 #include "sys/queue.h"
 #include "virtio.h"
-#include "xf86drmMode.h"
 #include <linux/virtio_gpu.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
+#include <xf86drm.h>
+#include <xf86drmMode.h>
 
 /*********************************************************************
     宏定义
@@ -34,20 +36,35 @@
 // 待支持VIRTIO_GPU_F_EDID、VIRTIO_GPU_F_RESOURCE_UUID、VIRTIO_GPU_F_RESOURCE_BLOB、VIRTIO_GPU_F_VIRGL、VIRTIO_GPU_F_CONTEXT_INIT
 #define GPU_SUPPORTED_FEATURES ((1ULL << VIRTIO_F_VERSION_1))
 
+// scanout[0]的默认配置
+#define SCANOUT_DEFAULT_WIDTH 1024
+
+#define SCANOUT_DEFAULT_HEIGHT 720
+
 // 求最小值宏
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 
 // virtio_gpu_formats和drm格式转换
-#define VIRTIO_GPU_FORMAT_TO_DRM_FORMAT(format)                                \
-  ((format == VIRTIO_GPU_FORMAT_X8R8G8B8_UNORM)   ? DRM_FORMAT_XRGB8888        \
-   : (format == VIRTIO_GPU_FORMAT_X8B8G8R8_UNORM) ? DRM_FORMAT_XBGR8888        \
-   : (format == VIRTIO_GPU_FORMAT_R8G8B8X8_UNORM) ? DRM_FORMAT_RGBX8888        \
-   : (format == VIRTIO_GPU_FORMAT_B8G8R8X8_UNORM) ? DRM_FORMAT_BGRX8888        \
-   : (format == VIRTIO_GPU_FORMAT_A8R8G8B8_UNORM) ? DRM_FORMAT_ARGB8888        \
-   : (format == VIRTIO_GPU_FORMAT_A8B8G8R8_UNORM) ? DRM_FORMAT_ABGR8888        \
-   : (format == VIRTIO_GPU_FORMAT_R8G8B8A8_UNORM) ? DRM_FORMAT_RGBA8888        \
-   : (format == VIRTIO_GPU_FORMAT_B8G8R8A8_UNORM) ? DRM_FORMAT_BGRA8888        \
-                                                  : 0 /* 未知格式 */)
+#define VIRTIO_GPU_FORMAT_TO_DRM_FORMAT(format)                                 \
+  ((format == VIRTIO_GPU_FORMAT_X8R8G8B8_UNORM)                                 \
+       ? DRM_FORMAT_XRGB8888                                                    \
+       : (format == VIRTIO_GPU_FORMAT_X8B8G8R8_UNORM)                           \
+             ? DRM_FORMAT_XBGR8888                                              \
+             : (format == VIRTIO_GPU_FORMAT_R8G8B8X8_UNORM)                     \
+                   ? DRM_FORMAT_RGBX8888                                        \
+                   : (format == VIRTIO_GPU_FORMAT_B8G8R8X8_UNORM)               \
+                         ? DRM_FORMAT_BGRX8888                                  \
+                         : (format == VIRTIO_GPU_FORMAT_A8R8G8B8_UNORM)         \
+                               ? DRM_FORMAT_ARGB8888                            \
+                               : (format == VIRTIO_GPU_FORMAT_A8B8G8R8_UNORM)   \
+                                     ? DRM_FORMAT_ABGR8888                      \
+                                     : (format ==                               \
+                                        VIRTIO_GPU_FORMAT_R8G8B8A8_UNORM)       \
+                                           ? DRM_FORMAT_RGBA8888                \
+                                           : (format ==                         \
+                                              VIRTIO_GPU_FORMAT_B8G8R8A8_UNORM) \
+                                                 ? DRM_FORMAT_BGRA8888          \
+                                                 : 0 /* 未知格式 */)
 
 /*********************************************************************
     结构体
@@ -100,9 +117,10 @@ typedef struct virtio_gpu_framebuffer {
                    // height等于总字节数(hostmem)
   uint32_t offset;
   // drm相关
+  uint32_t drm_dumb_size;   // 缓冲区大小
   uint32_t drm_dumb_handle; // 指向drm帧缓冲区的handle
-  void *fb_addr;
-  bool enabled;
+  void *fb_addr;            // 缓存区在本进程内的虚拟地址
+  bool enabled;             // 是否启用该缓冲区
 } GPUFrameBuffer;
 
 // 32-bit RGBA
@@ -116,7 +134,7 @@ typedef struct hvisor_cursor {
 // 实际显示设备相关的设置
 typedef struct virtio_gpu_scanout {
   uint32_t width, height;
-  int x, y;
+  uint32_t x, y;
   uint32_t resource_id;
   GPUUpdateCursor cursor;
   HvCursor *current_cursor;
@@ -195,7 +213,7 @@ int virtio_gpu_handle_single_request(VirtIODevice *vdev, VirtQueue *vq);
 #define VIRTIO_GPU_FILL_CMD(iov, iov_cnt, out)                                 \
   do {                                                                         \
     size_t virtiogpufillcmd_s_ =                                               \
-        iov_to_buf(iov, iov_cnt, 0, &out, sizeof(out));                        \
+        iov_to_buf(iov, iov_cnt, 0, &(out), sizeof(out));                      \
     if (virtiogpufillcmd_s_ != sizeof(out)) {                                  \
       log_error("cannot fill virtio gpu command with input!");                 \
       return;                                                                  \
@@ -203,7 +221,7 @@ int virtio_gpu_handle_single_request(VirtIODevice *vdev, VirtQueue *vq);
   } while (0)
 
 // 从iov拷贝任意大小到buffer
-size_t iov_to_buf_full(const struct iovec *iov, const unsigned int iov_cnt,
+size_t iov_to_buf_full(const struct iovec *iov, unsigned int iov_cnt,
                        size_t offset, void *buf, size_t bytes_need_copy);
 
 // 从buffer拷贝任意大小到iov
@@ -222,10 +240,9 @@ static inline size_t iov_to_buf(const struct iovec *iov, // NOLINT
     // 拷贝立刻返回
     memcpy(buf, (char *)iov[0].iov_base + offset, bytes_need_copy);
     return bytes_need_copy;
-  } else {
-    // 需要从iov的多个buffer进行拷贝
-    return iov_to_buf_full(iov, iov_cnt, offset, buf, bytes_need_copy);
   }
+  // 需要从iov的多个buffer进行拷贝
+  return iov_to_buf_full(iov, iov_cnt, offset, buf, bytes_need_copy);
 }
 
 // 从buffer填充iov，单次优化
@@ -236,9 +253,8 @@ static inline size_t buf_to_iov(const struct iovec *iov, // NOLINT
       offset <= iov[0].iov_len && bytes_need_copy <= iov[0].iov_len - offset) {
     memcpy((char *)iov[0].iov_base + offset, buf, bytes_need_copy);
     return bytes_need_copy;
-  } else {
-    return buf_to_iov_full(iov, iov_cnt, offset, buf, bytes_need_copy);
   }
+  return buf_to_iov_full(iov, iov_cnt, offset, buf, bytes_need_copy);
 }
 
 /*********************************************************************
@@ -287,9 +303,15 @@ void virtio_gpu_resource_unref(VirtIODevice *vdev, GPUCommand *gcmd);
 // flush一个已经链接到scanout的resource
 void virtio_gpu_resource_flush(VirtIODevice *vdev, GPUCommand *gcmd);
 
-// 创建一个drm_framebuffer并将resource的内容拷贝到该framebuffer
-// 之后flush
-void virtio_gpu_create_drm_framebuffer_and_flush();
+// 为scanout创建一个drm_framebuffer
+void virtio_gpu_create_drm_framebuffer(GPUScanout *scanout, uint32_t *error);
+
+// 将resource资源拷贝到scanout的drm_framebuffer并flush
+void virtio_gpu_copy_and_flush(GPUScanout *scanout, GPUSimpleResource *res,
+                               uint32_t *error);
+
+// 移除scanout的drm_framebuffer
+void virtio_gpu_remove_drm_framebuffer(GPUScanout *scanout, uint32_t *error);
 
 // 对应VIRTIO_GPU_CMD_SET_SCANOUT
 // 设置scanout的display参数，为scanout绑定resource
@@ -330,8 +352,7 @@ int virtio_gpu_create_mapping_iov(VirtIODevice *vdev, uint32_t nr_entries,
 void virtio_gpu_resource_detach_backing(VirtIODevice *vdev, GPUCommand *gcmd);
 
 // 根据control header处理请求
-void virtio_gpu_simple_process_cmd(struct iovec *iov,
-                                   const unsigned int iov_cnt,
+void virtio_gpu_simple_process_cmd(struct iovec *iov, unsigned int iov_cnt,
                                    uint16_t resp_idx, VirtIODevice *vdev);
 
 #endif /* _HVISOR_VIRTIO_GPU_H */

@@ -1,6 +1,6 @@
 [submodule "ruxos/patches/opensbi"]
 	path = ruxos/patches/opensbi
 	url = https://github.com/Sssssaltyfish/opensbi.git
-[submodule "ruxos/crates/lwip_rust/depend/lwip"]
-	path = ruxos/crates/lwip_rust/depend/lwip
-	url = https://github.com/lwip-tcpip/lwip.git
+# [submodule "ruxos/crates/lwip_rust/depend/lwip"]
+# 	path = ruxos/crates/lwip_rust/depend/lwip
+# 	url = https://github.com/lwip-tcpip/lwip.git

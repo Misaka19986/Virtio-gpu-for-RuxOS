@@ -1,0 +1,54 @@
+InlayHints:
+  BlockEnd: Yes
+  Designators: Yes
+  Enabled: Yes
+  ParameterNames: Yes
+  DeducedTypes: Yes
+  TypeNameLimit: 24
+
+If:
+  PathMatch: ".*"
+  PathExclude: "/usr/.*"
+
+Diagnostics:
+  UnusedIncludes: Strict
+  ClangTidy:
+    Add:
+    [
+      performance-*,
+      bugprone-*,
+      clang-analyzer-*,
+      readability-*,
+      cert-*,
+      cppcoreguidelines-*,
+      misc-*,
+    ]
+    Remove:
+    [
+      cert-dcl16-c, # Allows non-const globals
+      cert-env33-c, # Do not call system()
+      cert-err34-c, # Detect and handle standard library errors
+      cert-msc30-c, # Do not use the rand() function for secure random numbers
+      cert-msc32-c, # Properly seed pseudo-random number generator (PRNG)
+      cert-msc50-cpp, # Do not define a C-style variadic function
+      cert-msc51-cpp, # Ensure your random number generator is properly seeded
+      clang-analyzer-optin.cplusplus.VirtualCall, # Avoid calling virtual methods in constructors/destructors
+      clang-analyzer-optin.performance.Padding, # Optimize for structure padding
+      clang-diagnostic-unused-value, # Detect unused value
+      clang-diagnostic-unused-variable, # Detect unused variable
+      clang-diagnostic-sign-conversion, # Detect implicit conversion changes signedness
+      clang-diagnostic-missing-variable-declarations, # Detect missing variable declarations
+      clang-diagnostic-implicit-function-declaration, # Detect implicit function declaration
+      cppcoreguidelines-avoid-magic-numbers, # Avoid magic numbers
+      cppcoreguidelines-pro-bounds-constant-array-index, # Enforce bounds safety for constant array index
+      cppcoreguidelines-pro-bounds-pointer-arithmetic, # Enforce bounds safety for pointer arithmetic
+      cppcoreguidelines-pro-type-cstyle-cast, # Avoid C-style casts
+      cppcoreguidelines-pro-type-reinterpret-cast, # Avoid reinterpret_cast
+      cppcoreguidelines-pro-type-union-access, # Avoid union access
+      readability-identifier-length, # Ensure identifier length is reasonable
+      readability-implicit-bool-conversion, # Avoid implicit conversions of boolean values
+      modernize-avoid-c-arrays,
+      cppcoreguidelines-avoid-magic-numbers,
+      cppcoreguidelines-avoid-c-arrays,
+      readability-magic-numbers
+    ]

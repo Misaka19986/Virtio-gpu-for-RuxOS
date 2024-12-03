@@ -221,7 +221,7 @@ sudo cp /usr/local/Virt-GPU-for-RuxOS/hvisor-tool/examples/qemu-aarch64/virtio_c
 sudo cp /usr/local/Virt-GPU-for-RuxOS/hvisor-tool/examples/qemu-aarch64/zone1_linux.json rootfs/home/arm64
 ```
 
-### 编译virtio gpu所需的libdrm-dev
+### 编译virtio gpu所需的libdrm-dev(deprecated)
 因为virtio gpu需要drm相关组件来控制显示设备，因此如果需要自己编译，则需要安装不同平台的libdrm-dev
 
 以目标平台为arm64举例
@@ -248,7 +248,11 @@ mkdir install
 # 注意，prefix一定要是绝对路径
 ```
 
-之后在你语言服务器启动时添加相关路径即可。在编译hvisor-tool时，需要修改tools文件夹下的makefile，让aarch64-linux-gnu-gcc知道这个include路径
+之后在你语言服务器启动时添加相关路径即可。在编译hvisor-tool时，需要修改tools文件夹下的makefile，让aarch64-linux-gnu-gcc知道这个include路径，同时手动链接动态库
+
+```Makefile
+-I/usr/aarch64-linux-gnu/include -I/usr/aarch64-linux-gnu/include/libdrm -L/usr/aarch64-linux-gnu/lib -ldrm
+```
 
 ### 语言服务器和VSC插件的使用
 - **Rust**
