@@ -8,8 +8,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
-#include <xf86drm.h>
-#include <xf86drmMode.h>
 
 GPUDev *init_gpu_dev(GPURequestedState *requested_state) {
   log_info("initializing GPUDev");
@@ -52,7 +50,6 @@ GPUDev *init_gpu_dev(GPURequestedState *requested_state) {
   // dev->scanouts[0].y = 0;
   // dev->scanouts[0].resource_id = 0;
   dev->scanouts[0].current_cursor = NULL;
-  dev->scanouts[0].card0_fd = -1;
   dev->enabled_scanout_bitmask |= (1 << 0); // 启用scanout 0
 
   // scanout的framebuffer由驱动前端设置，见virtio_gpu_set_scanout
@@ -83,68 +80,6 @@ int virtio_gpu_init(VirtIODevice *vdev) {
   // 设置virtio gpu的关闭函数
   vdev->virtio_close = virtio_gpu_close;
 
-  int drm_fd = 0;
-
-  // 打开card0
-  drm_fd = open("/dev/dri/renderD128", O_RDWR | O_CLOEXEC);
-  if (drm_fd < 0) {
-    log_error("%s failed to open /dev/dri/card0", __func__);
-    return -1;
-  }
-
-  // 获取drm资源
-  // 需要获得设备的连接器(connector)、显示控制器(CRTC)、encoder、framebuffer
-  drmModeRes *res = drmModeGetResources(drm_fd);
-  if (!res) {
-      log_error("%s cannot get card0 resource", __func__);
-    close(drm_fd);
-    return -1;
-  }
-
-  // 获取connector
-  drmModeConnector *connector = NULL;
-  for (int i = 0; i < res->count_connectors; ++i) {
-    connector = drmModeGetConnector(drm_fd, res->connectors[i]);
-    if (connector->connection == DRM_MODE_CONNECTED) {
-      break;
-    }
-    drmModeFreeConnector(connector);
-  }
-
-  if (!connector || connector->connection != DRM_MODE_CONNECTED) {
-    log_error("%s cannot find a connector", __func__);
-    drmModeFreeResources(res);
-    close(drm_fd);
-    return -1;
-  }
-
-  // 获取encoder
-  drmModeEncoder *encoder = drmModeGetEncoder(drm_fd, connector->encoder_id);
-  if (!encoder) {
-    log_error("%s cannot get encoder", __func__);
-    drmModeFreeConnector(connector);
-    drmModeFreeResources(res);
-    close(drm_fd);
-    return -1;
-  }
-
-  // 获取CRTC
-  drmModeCrtc *crtc = drmModeGetCrtc(drm_fd, encoder->crtc_id);
-  if (!crtc) {
-    log_error("%s cannot get CRTC", __func__);
-    drmModeFreeEncoder(encoder);
-    drmModeFreeConnector(connector);
-    drmModeFreeResources(res);
-    close(drm_fd);
-    return -1;
-  }
-  // drmModeModeInfo mode = connector->modes[0];
-
-  gdev->scanouts[0].card0_fd = drm_fd;
-  gdev->scanouts[0].crtc = crtc;
-  gdev->scanouts[0].connector = connector;
-  gdev->scanouts[0].encoder = encoder;
-
   return 0;
 }
 
@@ -155,13 +90,6 @@ void virtio_gpu_close(VirtIODevice *vdev) {
   GPUDev *gdev = (GPUDev *)vdev->dev;
   for (int i = 0; i < gdev->scanouts_num; ++i) {
     free(gdev->scanouts[i].current_cursor);
-    drmModeFreeCrtc(gdev->scanouts[i].crtc);
-    drmModeFreeEncoder(gdev->scanouts[i].encoder);
-    drmModeFreeConnector(gdev->scanouts[i].connector);
-    // 释放card0_fd
-    if (gdev->scanouts[i].card0_fd != -1) {
-      close(gdev->scanouts[i].card0_fd);
-    }
   }
 
   // 回收resource相关内存

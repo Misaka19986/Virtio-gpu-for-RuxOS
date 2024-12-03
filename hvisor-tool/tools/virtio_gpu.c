@@ -5,16 +5,11 @@
 #include "log.h"
 #include "sys/queue.h"
 #include "virtio.h"
-#include <drm/drm.h>
-#include <drm/drm_fourcc.h>
-#include <drm/drm_mode.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
-#include <xf86drm.h>
-#include <xf86drmMode.h>
 
 void virtio_gpu_ctrl_response(VirtIODevice *vdev, GPUCommand *gcmd,
                               GPUControlHeader *resp, size_t resp_len) {
@@ -232,7 +227,7 @@ void virtio_gpu_resource_flush(VirtIODevice *vdev, GPUCommand *gcmd) {
     scanout = &gdev->scanouts[i];
 
     if (!scanout->frame_buffer.enabled) {
-      virtio_gpu_create_drm_framebuffer(scanout, &gcmd->error);
+      virtio_gpu_create_framebuffer(scanout, &gcmd->error);
       if (gcmd->error) {
         return;
       }
@@ -247,63 +242,13 @@ void virtio_gpu_resource_flush(VirtIODevice *vdev, GPUCommand *gcmd) {
   }
 }
 
-void virtio_gpu_create_drm_framebuffer(GPUScanout *scanout, uint32_t *error) {
+void virtio_gpu_create_framebuffer(GPUScanout *scanout, uint32_t *error) {
   if (scanout->frame_buffer.enabled) {
     return;
   }
 
   // 若scanout的frame_buffer还没有初始化过
   GPUFrameBuffer *fb = &scanout->frame_buffer;
-
-  struct drm_mode_create_dumb dumb = {0};
-  struct drm_mode_map_dumb map = {0};
-  dumb.width = fb->width;
-  dumb.height = fb->height;
-  dumb.bpp = fb->bytes_pp * 8;
-  uint32_t offsets[4] = {0};
-  uint32_t fb_id = 0;
-
-  if (drmIoctl(scanout->card0_fd, DRM_IOCTL_MODE_CREATE_DUMB, &dumb) < 0) {
-    log_error("%s failed to create a drm dumb", __func__);
-    *error = VIRTIO_GPU_RESP_ERR_UNSPEC;
-    return;
-  } // 创建一个dumb对象
-
-  uint32_t drm_format = VIRTIO_GPU_FORMAT_TO_DRM_FORMAT(fb->format);
-  if (!drm_format) {
-    log_error("%s found drm_framebuffer has an unknown format", __func__);
-    *error = VIRTIO_GPU_RESP_ERR_UNSPEC;
-    return;
-  }
-
-  // 向drm设备注册一个新缓冲区
-  drmModeAddFB2(scanout->card0_fd, dumb.width, dumb.height, drm_format,
-                &dumb.handle, &dumb.pitch, offsets, &fb_id, 0);
-
-  ///
-  log_debug("%s create a drm_framebuffer with width: %d, height: %d, "
-            "format: %d, handle: %d, fb_id: %d",
-            __func__, dumb.width, dumb.height, drm_format, dumb.handle, fb_id);
-  ///
-
-  map.handle = dumb.handle;
-  drmIoctl(scanout->card0_fd, DRM_IOCTL_MODE_MAP_DUMB,
-           &map); // 将显存与framebuffer绑定，根据handle获得offset
-
-  void *vaddr = mmap(0, dumb.size, PROT_READ | PROT_WRITE, MAP_SHARED,
-                     scanout->card0_fd, map.offset);
-
-  if (!vaddr) {
-    log_error("%s cannot map drm_framebuffer of scanout", __func__);
-    *error = VIRTIO_GPU_RESP_ERR_UNSPEC;
-    return;
-  }
-
-  fb->framebuffer_id = fb_id;
-  fb->drm_dumb_handle = dumb.handle;
-  fb->drm_dumb_size = dumb.size;
-  fb->fb_addr = vaddr;
-  fb->enabled = true;
 }
 
 void virtio_gpu_copy_and_flush(GPUScanout *scanout, GPUSimpleResource *res,
@@ -350,14 +295,9 @@ void virtio_gpu_copy_and_flush(GPUScanout *scanout, GPUSimpleResource *res,
     iov_to_buf(res->iov, res->iov_cnt, src_offset, fb->fb_addr + dst_offset,
                stride * res->transfer_rect.height);
   }
-
-  // TODO(root): 控制CRTC输出
-  drmModeModeInfo mode = scanout->connector->modes[0];
-  drmModeSetCrtc(scanout->card0_fd, scanout->crtc->crtc_id, fb->framebuffer_id,
-                 0, 0, &scanout->connector->connector_id, 1, &mode);
 }
 
-void virtio_gpu_remove_drm_framebuffer(GPUScanout *scanout, uint32_t *error) {
+void virtio_gpu_remove_framebuffer(GPUScanout *scanout, uint32_t *error) {
   GPUFrameBuffer *fb = &scanout->frame_buffer;
 
   if (!fb || !fb->enabled || !fb->fb_addr) {
@@ -365,24 +305,6 @@ void virtio_gpu_remove_drm_framebuffer(GPUScanout *scanout, uint32_t *error) {
     *error = VIRTIO_GPU_RESP_ERR_UNSPEC;
     return;
   }
-
-  struct drm_mode_destroy_dumb destory = {0};
-  destory.handle = fb->drm_dumb_handle;
-
-  drmModeRmFB(scanout->card0_fd, fb->framebuffer_id);
-  munmap(fb->fb_addr, fb->drm_dumb_size);
-  drmIoctl(scanout->card0_fd, DRM_IOCTL_MODE_DESTROY_DUMB, &destory);
-
-  log_debug("%s destoryed drm_framebuffer with id: %d, handle: %d, size: %d",
-            __func__, fb->framebuffer_id, fb->drm_dumb_handle,
-            fb->drm_dumb_size);
-
-  // 保留其他信息
-  fb->framebuffer_id = 0;
-  fb->drm_dumb_handle = 0;
-  fb->drm_dumb_size = 0;
-  fb->fb_addr = NULL;
-  fb->enabled = false;
 }
 
 void virtio_gpu_set_scanout(VirtIODevice *vdev, GPUCommand *gcmd) {

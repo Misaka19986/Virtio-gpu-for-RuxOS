@@ -87,7 +87,7 @@ typedef struct virtio_gpu_ctrl_hdr GPUControlHeader;
 typedef struct virtio_gpu_update_cursor GPUUpdateCursor;
 
 // 渲染时存储在内存中的资源对象(图片等)
-// 在使用时，需要从iov转换成一个drm_mode_create_dumb对象来输出
+// 在使用时，需要从iov转换至framebuffer来进行输出
 typedef struct virtio_gpu_simple_resource {
   uint32_t resource_id;   // 资源id
   uint32_t width, height; // 资源的宽和高
@@ -106,7 +106,7 @@ typedef struct virtio_gpu_simple_resource {
 
 typedef struct virtio_gpu_framebuffer {
   // TODO: 双缓冲区
-  uint32_t framebuffer_id; // framebuffer的id
+  uint32_t fb_id; // framebuffer的id
   // TODO: format格式
   // format主要决定了每一个像素占多少字节
   // virtio_gpu_formats提供的都是4bytes per pixel大小的格式
@@ -116,11 +116,8 @@ typedef struct virtio_gpu_framebuffer {
   uint32_t stride; // stride(步幅)指图像的每一行在内存中所占的字节数，stride *
                    // height等于总字节数(hostmem)
   uint32_t offset;
-  // drm相关
-  uint32_t drm_dumb_size;   // 缓冲区大小
-  uint32_t drm_dumb_handle; // 指向drm帧缓冲区的handle
-  void *fb_addr;            // 缓存区在本进程内的虚拟地址
-  bool enabled;             // 是否启用该缓冲区
+  void *fb_addr; // 缓存区在本进程内的虚拟地址
+  bool enabled;  // 是否启用该缓冲区
 } GPUFrameBuffer;
 
 // 32-bit RGBA
@@ -139,12 +136,6 @@ typedef struct virtio_gpu_scanout {
   GPUUpdateCursor cursor;
   HvCursor *current_cursor;
   GPUFrameBuffer frame_buffer;
-  // 使用的输出card
-  int card0_fd;
-  // drm相关
-  drmModeCrtc *crtc;
-  drmModeEncoder *encoder;
-  drmModeConnector *connector;
 } GPUScanout;
 
 // 由json指定的显示设备的设置
@@ -303,15 +294,15 @@ void virtio_gpu_resource_unref(VirtIODevice *vdev, GPUCommand *gcmd);
 // flush一个已经链接到scanout的resource
 void virtio_gpu_resource_flush(VirtIODevice *vdev, GPUCommand *gcmd);
 
-// 为scanout创建一个drm_framebuffer
-void virtio_gpu_create_drm_framebuffer(GPUScanout *scanout, uint32_t *error);
+// 为scanout创建一个framebuffer
+void virtio_gpu_create_framebuffer(GPUScanout *scanout, uint32_t *error);
 
 // 将resource资源拷贝到scanout的drm_framebuffer并flush
 void virtio_gpu_copy_and_flush(GPUScanout *scanout, GPUSimpleResource *res,
                                uint32_t *error);
 
 // 移除scanout的drm_framebuffer
-void virtio_gpu_remove_drm_framebuffer(GPUScanout *scanout, uint32_t *error);
+void virtio_gpu_remove_framebuffer(GPUScanout *scanout, uint32_t *error);
 
 // 对应VIRTIO_GPU_CMD_SET_SCANOUT
 // 设置scanout的display参数，为scanout绑定resource
