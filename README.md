@@ -221,7 +221,7 @@ sudo cp /usr/local/Virt-GPU-for-RuxOS/hvisor-tool/examples/qemu-aarch64/virtio_c
 sudo cp /usr/local/Virt-GPU-for-RuxOS/hvisor-tool/examples/qemu-aarch64/zone1_linux.json rootfs/home/arm64
 ```
 
-### 编译virtio gpu所需的libdrm-dev(deprecated)
+### 编译virtio gpu所需的drm(deprecated)
 因为virtio gpu需要drm相关组件来控制显示设备，因此如果需要自己编译，则需要安装不同平台的libdrm-dev
 
 以目标平台为arm64举例
@@ -253,6 +253,20 @@ mkdir install
 ```Makefile
 -I/usr/aarch64-linux-gnu/include -I/usr/aarch64-linux-gnu/include/libdrm -L/usr/aarch64-linux-gnu/lib -ldrm
 ```
+
+### 编译virtio gpu所需的sdl2
+从github下载sdl2的源码
+
+```shell
+git clone https://github.com/libsdl-org/SDL.git -b SDL2
+cd SDL
+mkdir build
+cd build
+../configure --host=aarch64-linux-gnu --prefix=/usr/aarch64-linux-gnu --enable-shared --disable-static && make -j$(nproc)&& make install
+# ../configure --host=arm-linux --prefix=/usr/aarch64-linux-gnu --disable-static && make -j$(nproc)&& make install
+```
+
+在Makefile中添加相关的include和lib
 
 ### 语言服务器和VSC插件的使用
 - **Rust**

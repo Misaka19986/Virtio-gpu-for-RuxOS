@@ -7,8 +7,6 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
-#include <xf86drm.h>
-#include <xf86drmMode.h>
 
 /*********************************************************************
     宏定义
