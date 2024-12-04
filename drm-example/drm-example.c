@@ -1,4 +1,4 @@
-#include "drm/drm.h"
+#include <drm/drm.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdbool.h>
@@ -72,7 +72,7 @@ int main(int argc, char **argv) {
   uint32_t conn_id;
   uint32_t crtc_id;
 
-  fd = open("/dev/dri/card0",
+  fd = open("/dev/dri/card1",
             O_RDWR | O_CLOEXEC); //打开card0，card0一般绑定HDMI和LVDS
 
   resources = drmModeGetResources(
