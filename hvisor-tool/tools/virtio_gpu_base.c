@@ -86,9 +86,9 @@ int virtio_gpu_init(VirtIODevice *vdev) {
   int drm_fd = 0;
 
   // 打开card0
-  drm_fd = open("/dev/dri/renderD128", O_RDWR | O_CLOEXEC);
+  drm_fd = open("/dev/dri/card1", O_RDWR | O_CLOEXEC);
   if (drm_fd < 0) {
-    log_error("%s failed to open /dev/dri/card0", __func__);
+    log_error("%s failed to open /dev/dri/card1", __func__);
     return -1;
   }
 
@@ -96,7 +96,7 @@ int virtio_gpu_init(VirtIODevice *vdev) {
   // 需要获得设备的连接器(connector)、显示控制器(CRTC)、encoder、framebuffer
   drmModeRes *res = drmModeGetResources(drm_fd);
   if (!res) {
-      log_error("%s cannot get card0 resource", __func__);
+    log_error("%s cannot get card0 resource", __func__);
     close(drm_fd);
     return -1;
   }
@@ -144,6 +144,11 @@ int virtio_gpu_init(VirtIODevice *vdev) {
   gdev->scanouts[0].crtc = crtc;
   gdev->scanouts[0].connector = connector;
   gdev->scanouts[0].encoder = encoder;
+
+  log_debug("%s set scanout[0] card0_fd %d", __func__, drm_fd);
+  log_debug("%s set scanout[0] crtc %x", __func__, crtc);
+  log_debug("%s set scanout[0] connector %x", __func__, connector);
+  log_debug("%s set scanout[0] encoder %x", __func__, encoder);
 
   return 0;
 }

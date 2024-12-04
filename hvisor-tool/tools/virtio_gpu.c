@@ -293,6 +293,8 @@ void virtio_gpu_create_drm_framebuffer(GPUScanout *scanout, uint32_t *error) {
   void *vaddr = mmap(0, dumb.size, PROT_READ | PROT_WRITE, MAP_SHARED,
                      scanout->card0_fd, map.offset);
 
+  log_debug("%s map drm_framebuffer to %x", __func__, vaddr);
+
   if (!vaddr) {
     log_error("%s cannot map drm_framebuffer of scanout", __func__);
     *error = VIRTIO_GPU_RESP_ERR_UNSPEC;
@@ -340,15 +342,25 @@ void virtio_gpu_copy_and_flush(GPUScanout *scanout, GPUSimpleResource *res,
       dst_offset =
           (res->transfer_rect.y + h) * stride + (res->transfer_rect.x * bpp);
 
-      iov_to_buf(res->iov, res->iov_cnt, src_offset, fb->fb_addr + dst_offset,
-                 res->transfer_rect.width * bpp);
+      size_t s =
+          iov_to_buf(res->iov, res->iov_cnt, src_offset,
+                     fb->fb_addr + dst_offset, res->transfer_rect.width * bpp);
+
+      // debug
+      log_debug("%s copy %d bytes from resource %d to drm_framebuffer",
+                __func__, res->resource_id, s);
     }
   } else {
     src_offset = res->transfer_offset;
     dst_offset = res->transfer_rect.y * stride + res->transfer_rect.x * bpp;
 
-    iov_to_buf(res->iov, res->iov_cnt, src_offset, fb->fb_addr + dst_offset,
-               stride * res->transfer_rect.height);
+    size_t s =
+        iov_to_buf(res->iov, res->iov_cnt, src_offset, fb->fb_addr + dst_offset,
+                   stride * res->transfer_rect.height);
+
+    // debug
+    log_debug("%s copy %d bytes from resource %d to drm_framebuffer", __func__,
+              res->resource_id, s);
   }
 
   // TODO(root): 控制CRTC输出

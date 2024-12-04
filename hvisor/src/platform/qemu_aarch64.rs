@@ -54,4 +54,4 @@ pub const ROOT_PCI_CONFIG: HvPciConfig = HvPciConfig {
     pci_mem64_base: 0x8000000000,
 };
 
-pub const ROOT_PCI_DEVS: [u64; 2] = [0, 1 << 3];
+pub const ROOT_PCI_DEVS: [u64; 3] = [0, 1 << 3, 6 << 3];
