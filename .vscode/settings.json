@@ -18,6 +18,9 @@
 	"rust-analyzer.cargo.features": [
 		"platform_qemu"
 	],
+	// "rust-analyzer.server.extraEnv": {
+	// 	"RA_LOG": "info"
+	// },
 	/* clangd */
 	"clangd.arguments": [
 		"--compile-commands-dir=${workspaceFolder}/build",
@@ -35,6 +38,8 @@
 		"-I/usr/local/bin/linux/include",
 		"-I/usr/aarch64-linux-gnu/include",
 		"-I/usr/local/bin/linux/arch/arm64/include",
+		// "-I/usr/local/bin/libdrm-2.4.100/install/include",
+		// "-I/usr/local/bin/libdrm-2.4.100/include",
 		"-DARM64",
 		"-D__KERNEL__",
 		"-DMODULE"

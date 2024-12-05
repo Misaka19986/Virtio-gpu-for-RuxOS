@@ -38,9 +38,9 @@
         },
         {
             "type": "virtio",
-            "physical_start": "0xa003400",
-            "virtual_start": "0xa003400",
-            "size": "0x200"
+            "physical_start": "0xa000000",
+            "virtual_start": "0xa000000",
+            "size": "0x4000"
         }
     ],
     "interrupts": [
@@ -62,7 +62,7 @@
             "max_peers": 2
         }
     ],
-    "kernel_filepath": "./basic_painting_aarch64-qemu-virt.bin",
+    "kernel_filepath": "./draw_map_aarch64-qemu-virt.bin",
     "dtb_filepath": "./qemu-ruxos.dtb",
     "kernel_load_paddr": "0x50080000",
     "dtb_load_paddr": "0x50000000",

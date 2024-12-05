@@ -1,0 +1,1 @@
+aarch64-linux-gnu-gcc -Wall -Wextra -DLOG_USE_COLOR -DHLOG=LOG_DEBUG -O2 -I/usr/aarch64-linux-gnu/include -I/usr/aarch64-linux-gnu/include/libdrm -L/usr/aarch64-linux-gnu/lib -o drm-example drm-example.c -ldrm

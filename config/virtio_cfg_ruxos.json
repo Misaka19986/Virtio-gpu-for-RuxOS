@@ -15,8 +15,8 @@
                     "addr": "0xa003400",
                     "len": "0x200",
                     "irq": 74,
-                    "width": 1024,
-                    "height": 720,
+                    "width": 1280,
+                    "height": 800,
                     "status": "enable"
                 }
             ]

@@ -12,7 +12,7 @@ export LOG
 all: tools driver
 
 env:
-	git submodule update --init --recursive
+	# git submodule update --init --recursive
 
 tools: env
 	$(MAKE) -C tools all

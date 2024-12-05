@@ -221,6 +221,39 @@ sudo cp /usr/local/Virt-GPU-for-RuxOS/hvisor-tool/examples/qemu-aarch64/virtio_c
 sudo cp /usr/local/Virt-GPU-for-RuxOS/hvisor-tool/examples/qemu-aarch64/zone1_linux.json rootfs/home/arm64
 ```
 
+### 编译virtio gpu所需的libdrm-dev(deprecated)
+因为virtio gpu需要drm相关组件来控制显示设备，因此如果需要自己编译，则需要安装不同平台的libdrm-dev
+
+以目标平台为arm64举例
+
+```shell
+# 首先下载libdrm
+wget https://dri.freedesktop.org/libdrm/libdrm-2.4.100.tar.gz
+tar -xzvf libdrm-2.4.100.tar.gz
+cd libdrm-2.4.100
+```
+
+注: 2.4.100以上的版本需要较新版本的meson编译，因为笔者使用wsl2，其内核较旧，没办法安装最新的meson，故使用旧版
+
+接下来配置configure
+```shell
+# 安装到你的aarch64-linux-gnu
+# 为了方便可以这么安装，只不过不容易进行版本控制
+./configure --host=aarch64-linux-gnu --prefix=/usr/aarch64-linux-gnu && make && make install
+
+# 安装到其他文件夹，例如源码文件夹下的install
+mkdir install
+./configure --host=aarch64-linux-gnu --prefix=/path_to_install/install && make && make install
+
+# 注意，prefix一定要是绝对路径
+```
+
+之后在你语言服务器启动时添加相关路径即可。在编译hvisor-tool时，需要修改tools文件夹下的makefile，让aarch64-linux-gnu-gcc知道这个include路径，同时手动链接动态库
+
+```Makefile
+-I/usr/aarch64-linux-gnu/include -I/usr/aarch64-linux-gnu/include/libdrm -L/usr/aarch64-linux-gnu/lib -ldrm
+```
+
 ### 语言服务器和VSC插件的使用
 - **Rust**
   - 使用rust-analyzer即可
@@ -238,4 +271,14 @@ sudo cp /usr/local/Virt-GPU-for-RuxOS/hvisor-tool/examples/qemu-aarch64/zone1_li
     - 配置根目录的.ccls文件来设置include路径
   - include路径
     - 包括所使用的Linux kernel镜像的include，以及Linux kernel目标arch下的include
-    - 还有hvisor-tool的各级include
+    - 以及跨平台编译器的include，例如aarch64-linux-gnu
+    - libdrm的include
+    - hvisor-tool的各级include
+
+同时，为你的语法服务器添加以下配置
+
+"-DARM64",  // 由你的目标平台决定
+"-D__KERNEL__",
+"-DMODULE"
+
+若使用clangd，则添加在settings.json中；若使用ccls，则添加在.ccls中

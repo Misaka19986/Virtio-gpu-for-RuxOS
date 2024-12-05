@@ -174,6 +174,7 @@ VirtIODevice *create_virtio_device(VirtioDeviceType dev_type, uint32_t zone_id,
   case VirtioTGPU:
     vdev->regs.dev_feature = GPU_SUPPORTED_FEATURES;
     vdev->dev = init_gpu_dev((GPURequestedState *)arg0);
+    free(arg0);
     init_virtio_queue(vdev, dev_type);
     is_err = virtio_gpu_init(vdev);
     break;
@@ -198,7 +199,7 @@ VirtIODevice *create_virtio_device(VirtioDeviceType dev_type, uint32_t zone_id,
     goto err;
   }
 
-  log_info("create virtio device %d success", dev_type);
+  log_info("create %s success", virtio_device_type_to_string(dev_type));
   vdevs[vdevs_num++] = vdev;
 
   return vdev;
@@ -1054,11 +1055,6 @@ int create_virtio_device_from_json(cJSON *device_json, int zone_id) {
   // 创建virtio_device
   if (!create_virtio_device(dev_type, zone_id, base_addr, len, irq_id, arg0,
                             arg1)) {
-    log_error("create virtio device failed");
-    // 销毁requested_state
-    if (requested_state != NULL) {
-      free(requested_state);
-    }
     return -1;
   }
 
@@ -1111,6 +1107,7 @@ int virtio_start_from_json(char *json_path) {
         log_error("Invalid memory size");
         continue;
       }
+      // 将从zone0_ipa开始
       virt_addr = mmap(NULL, mem_size, PROT_READ | PROT_WRITE, MAP_SHARED,
                        ko_fd, (off_t)zone0_ipa);
       if (virt_addr == (void *)-1) {

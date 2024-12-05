@@ -30,6 +30,8 @@ static int hvisor_init_virtio(void) {
     return ENOTTY;
   }
   virtio_bridge = (struct virtio_bridge *)__get_free_pages(GFP_KERNEL, 0);
+  pr_info("virtio_bridge allocated at physical address: %x\n",
+          virt_to_phys(virtio_bridge));
   if (virtio_bridge == NULL)
     return -ENOMEM;
   SetPageReserved(virt_to_page(virtio_bridge));
