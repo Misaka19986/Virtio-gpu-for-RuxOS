@@ -146,8 +146,10 @@ int virtio_gpu_init(VirtIODevice *vdev) {
   gdev->scanouts[0].encoder = encoder;
 
   log_debug("%s set scanout[0] card0_fd %d", __func__, drm_fd);
-  log_debug("%s set scanout[0] crtc %x with id %d", __func__, crtc, crtc->crtc_id);
-  log_debug("%s set scanout[0] connector %x with id %d", __func__, connector, connector->connector_id);
+  log_debug("%s set scanout[0] crtc %x with id %d", __func__, crtc,
+            crtc->crtc_id);
+  log_debug("%s set scanout[0] connector %x with id %d", __func__, connector,
+            connector->connector_id);
   log_debug("%s get scanout[0] connector mode hdisplay: %d, vdisplay: %d",
             __func__, connector->modes[0].hdisplay,
             connector->modes[0].vdisplay);
@@ -166,9 +168,13 @@ void virtio_gpu_close(VirtIODevice *vdev) {
   GPUDev *gdev = (GPUDev *)vdev->dev;
   for (int i = 0; i < gdev->scanouts_num; ++i) {
     free(gdev->scanouts[i].current_cursor);
+
+    virtio_gpu_remove_drm_framebuffer(&gdev->scanouts[i]);
+
     drmModeFreeCrtc(gdev->scanouts[i].crtc);
     drmModeFreeEncoder(gdev->scanouts[i].encoder);
     drmModeFreeConnector(gdev->scanouts[i].connector);
+
     // 释放card0_fd
     if (gdev->scanouts[i].card0_fd != -1) {
       close(gdev->scanouts[i].card0_fd);
@@ -265,7 +271,7 @@ int virtio_gpu_handle_single_request(VirtIODevice *vdev, VirtQueue *vq) {
     return 0;
   }
 
-  // !debug
+  // ! debug
   for (int i = 0; i < desc_processed_num; ++i) {
     char s[50] = "";
 

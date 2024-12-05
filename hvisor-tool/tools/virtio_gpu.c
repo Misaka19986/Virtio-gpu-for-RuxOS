@@ -191,6 +191,65 @@ uint32_t calc_image_hostmem(int bits_per_pixel, uint32_t width,
 
 void virtio_gpu_resource_unref(VirtIODevice *vdev, GPUCommand *gcmd) {
   log_debug("entering %s", __func__);
+
+  GPUDev *gdev = vdev->dev;
+
+  GPUSimpleResource *res = NULL;
+  struct virtio_gpu_resource_unref unref;
+
+  VIRTIO_GPU_FILL_CMD(gcmd->resp_iov, gcmd->resp_iov_cnt, unref);
+
+  res = virtio_gpu_find_resource(gdev, unref.resource_id);
+  if (!res) {
+    log_error("%s cannot find resource %d", __func__, unref.resource_id);
+    gcmd->error = VIRTIO_GPU_RESP_ERR_INVALID_RESOURCE_ID;
+    return;
+  }
+
+  virtio_gpu_resource_destory(gdev, res);
+}
+
+void virtio_gpu_resource_destory(GPUDev *gdev, GPUSimpleResource *res) {
+  if (res->scanout_bitmask) {
+    for (int i = 0; i < HVISOR_VIRTIO_GPU_MAX_SCANOUTS; ++i) {
+      if (res->scanout_bitmask & (1 << i)) {
+        virtio_gpu_disable_scanout(gdev, i);
+      }
+    }
+  }
+
+  virtio_gpu_cleanup_mapping(gdev, res);
+  TAILQ_REMOVE(&gdev->resource_list, res, next);
+  gdev->hostmem -= res->hostmem;
+  free(res);
+}
+
+void virtio_gpu_disable_scanout(GPUDev *gdev, int scanout_id) {
+  GPUScanout *scanout = &gdev->scanouts[scanout_id];
+  GPUSimpleResource *res = NULL;
+
+  if (scanout->resource_id == 0) {
+    return;
+  }
+
+  res = virtio_gpu_find_resource(gdev, scanout->resource_id);
+  if (res) {
+    res->scanout_bitmask &= ~(1 << scanout_id);
+  }
+
+  scanout->resource_id = 0;
+  scanout->width = 0;
+  scanout->height = 0;
+}
+
+void virtio_gpu_cleanup_mapping(GPUDev *gdev, GPUSimpleResource *res) {
+  if (res->iov) {
+    free(res->iov);
+    // iov对应的内存块由guest处理
+  }
+
+  res->iov = NULL;
+  res->iov_cnt = 0;
 }
 
 void virtio_gpu_resource_flush(VirtIODevice *vdev, GPUCommand *gcmd) {
@@ -242,6 +301,7 @@ void virtio_gpu_resource_flush(VirtIODevice *vdev, GPUCommand *gcmd) {
       // TODO: 已经分配过一次framebuffer，若大小不合适，则需要重新分配
       // TODO: 包括munmap，以及调用drm的销毁函数
       // TODO: 将没分配过的情况封装
+
       virtio_gpu_copy_and_flush(scanout, res, &gcmd->error);
     }
   }
@@ -519,6 +579,7 @@ void virtio_gpu_update_scanout(VirtIODevice *vdev, uint32_t scanout_id,
   res->scanout_bitmask |= (1 << scanout_id);
   log_debug("%s updated scanout %d to resource %d", __func__, scanout_id,
             res->resource_id);
+
   // 更新scanout参数和framebuffer
   scanout->resource_id = res->resource_id;
   scanout->x = r->x;
@@ -693,8 +754,27 @@ int virtio_gpu_create_mapping_iov(VirtIODevice *vdev, uint32_t nr_entries,
   return 0;
 }
 
+// ! reserved
+// void virtio_gpu_cleanup_mapping_iov(GPUDev *gdev, struct iovec *iov,
+//                                     uint32_t iov_cnt) {}
+
 void virtio_gpu_resource_detach_backing(VirtIODevice *vdev, GPUCommand *gcmd) {
   log_debug("entering %s", __func__);
+
+  GPUDev *gdev = vdev->dev;
+
+  GPUSimpleResource *res = NULL;
+  struct virtio_gpu_resource_detach_backing detach;
+
+  VIRTIO_GPU_FILL_CMD(gcmd->resp_iov, gcmd->resp_iov_cnt, detach);
+
+  res = virtio_gpu_check_resource(vdev, detach.resource_id, __func__,
+                                  &gcmd->error);
+  if (!res) {
+    return;
+  }
+
+  virtio_gpu_cleanup_mapping(gdev, res);
 }
 
 void virtio_gpu_simple_process_cmd(struct iovec *iov, unsigned int iov_cnt,

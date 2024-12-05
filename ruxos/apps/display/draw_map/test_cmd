@@ -1,1 +1,1 @@
-make A=apps/display/draw_map GRAPHIC=y run
+make A=apps/display/draw_map GRAPHIC=y LOG=debug ARCH=aarch64 build

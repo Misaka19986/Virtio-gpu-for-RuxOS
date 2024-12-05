@@ -299,6 +299,15 @@ uint32_t calc_image_hostmem(int bits_per_pixel, uint32_t width,
 // 销毁一个resource
 void virtio_gpu_resource_unref(VirtIODevice *vdev, GPUCommand *gcmd);
 
+// 销毁指定的资源
+void virtio_gpu_resource_destory(GPUDev *gdev, GPUSimpleResource *res);
+
+// 注销给定scanout的resource，使scanout失效
+void virtio_gpu_disable_scanout(GPUDev *gdev, int scanout_id);
+
+// 清除资源的mapping
+void virtio_gpu_cleanup_mapping(GPUDev *gdev, GPUSimpleResource *res);
+
 // 对应VIRTIO_GPU_CMD_RESOURCE_FLUSH
 // flush一个已经链接到scanout的resource
 void virtio_gpu_resource_flush(VirtIODevice *vdev, GPUCommand *gcmd);
@@ -343,9 +352,8 @@ int virtio_gpu_create_mapping_iov(VirtIODevice *vdev, uint32_t nr_entries,
 
 // ! reserved
 // 清除映射
-//  void virtio_gpu_cleanup_mapping_iov(VirtIODevice *vdev,
-//                                            struct iovec *iov, uint32_t
-//                                            iov_cnt);
+// void virtio_gpu_cleanup_mapping_iov(GPUDev *gdev, struct iovec *iov,
+//                                     uint32_t iov_cnt);
 
 // 对应VIRTIO_GPU_CMD_RESOURCE_DETACH_BACKING
 // 从resource中解绑guest的内存区域
