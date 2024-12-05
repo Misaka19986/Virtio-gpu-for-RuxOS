@@ -269,39 +269,59 @@ void virtio_gpu_create_drm_framebuffer(GPUScanout *scanout, uint32_t *error) {
     return;
   } // 创建一个dumb对象
 
-  uint32_t drm_format = VIRTIO_GPU_FORMAT_TO_DRM_FORMAT(fb->format);
-  if (!drm_format) {
-    log_error("%s found drm_framebuffer has an unknown format", __func__);
+  map.handle = dumb.handle;
+  // 将显存与framebuffer绑定，根据handle获得offset
+  if (drmIoctl(scanout->card0_fd, DRM_IOCTL_MODE_MAP_DUMB, &map) < 0) {
+    log_error("%s failed to map a drm dumb", __func__);
+    virtio_gpu_remove_drm_framebuffer(scanout);
     *error = VIRTIO_GPU_RESP_ERR_UNSPEC;
     return;
   }
 
+  // ! legacy
+  // uint32_t drm_format = VIRTIO_GPU_FORMAT_TO_DRM_FORMAT(fb->format);
+  // if (!drm_format) {
+  //   log_error("%s found drm_framebuffer has an unknown format", __func__);
+  //   *error = VIRTIO_GPU_RESP_ERR_UNSPEC;
+  //   return;
+  // }
+
   // 向drm设备注册一个新缓冲区
-  drmModeAddFB2(scanout->card0_fd, dumb.width, dumb.height, drm_format,
-                &dumb.handle, &dumb.pitch, offsets, &fb_id, 0);
+  // ! legacy
+  // if (drmModeAddFB2(scanout->card0_fd, dumb.width, dumb.height, drm_format,
+  //                   &dumb.handle, &dumb.pitch, offsets, &fb_id, 0) < 0) {
+  //   log_error("%s failed to add a drm_framebuffer to card0", __func__);
+  //   *error = VIRTIO_GPU_RESP_ERR_UNSPEC;
+  //   return;
+  // }
+
+  if (drmModeAddFB(scanout->card0_fd, dumb.width, dumb.height, 24, 32,
+                   dumb.pitch, dumb.handle, &fb_id) < 0) {
+    log_error("%s failed to add a drm_framebuffer to card0", __func__);
+    *error = VIRTIO_GPU_RESP_ERR_UNSPEC;
+    return;
+  }
 
   ///
   log_debug("%s create a drm_framebuffer with width: %d, height: %d, "
             "format: %d, handle: %d, fb_id: %d",
-            __func__, dumb.width, dumb.height, drm_format, dumb.handle, fb_id);
+            __func__, dumb.width, dumb.height, fb->format, dumb.handle, fb_id);
   ///
-
-  map.handle = dumb.handle;
-  drmIoctl(scanout->card0_fd, DRM_IOCTL_MODE_MAP_DUMB,
-           &map); // 将显存与framebuffer绑定，根据handle获得offset
 
   void *vaddr = mmap(0, dumb.size, PROT_READ | PROT_WRITE, MAP_SHARED,
                      scanout->card0_fd, map.offset);
 
-  log_debug("%s map drm_framebuffer to %x", __func__, vaddr);
-
   if (!vaddr) {
     log_error("%s cannot map drm_framebuffer of scanout", __func__);
+    virtio_gpu_remove_drm_framebuffer(scanout);
     *error = VIRTIO_GPU_RESP_ERR_UNSPEC;
     return;
   }
 
-  fb->framebuffer_id = fb_id;
+  log_debug("%s map drm_framebuffer to %x with size %d", __func__, vaddr,
+            dumb.size);
+
+  fb->fb_id = fb_id;
   fb->drm_dumb_handle = dumb.handle;
   fb->drm_dumb_size = dumb.size;
   fb->fb_addr = vaddr;
@@ -347,8 +367,9 @@ void virtio_gpu_copy_and_flush(GPUScanout *scanout, GPUSimpleResource *res,
                      fb->fb_addr + dst_offset, res->transfer_rect.width * bpp);
 
       // debug
-      log_debug("%s copy %d bytes from resource %d to drm_framebuffer",
-                __func__, res->resource_id, s);
+      log_debug("%s copy %d bytes from resource %d to drm_framebuffer, "
+                "src_offset: %d, dst_offset: %d",
+                __func__, s, res->resource_id, src_offset, dst_offset);
     }
   } else {
     src_offset = res->transfer_offset;
@@ -359,38 +380,44 @@ void virtio_gpu_copy_and_flush(GPUScanout *scanout, GPUSimpleResource *res,
                    stride * res->transfer_rect.height);
 
     // debug
-    log_debug("%s copy %d bytes from resource %d to drm_framebuffer", __func__,
-              res->resource_id, s);
+    log_debug("%s copy %d bytes from resource %d to drm_framebuffer, "
+              "src_offset: %d, dst_offset: %d",
+              __func__, s, res->resource_id, src_offset, dst_offset);
   }
 
   // TODO(root): 控制CRTC输出
   drmModeModeInfo mode = scanout->connector->modes[0];
-  drmModeSetCrtc(scanout->card0_fd, scanout->crtc->crtc_id, fb->framebuffer_id,
-                 0, 0, &scanout->connector->connector_id, 1, &mode);
+  drmModeSetCrtc(scanout->card0_fd, scanout->crtc->crtc_id, fb->fb_id, 0, 0,
+                 &scanout->connector->connector_id, 1, &mode);
+
+  log_debug("%s flush with card0_fd: %d, crtc_id: %d, fb_id: %d, "
+            "connector_id: %d",
+            __func__, scanout->card0_fd, scanout->crtc->crtc_id, fb->fb_id,
+            scanout->connector->connector_id);
 }
 
-void virtio_gpu_remove_drm_framebuffer(GPUScanout *scanout, uint32_t *error) {
+void virtio_gpu_remove_drm_framebuffer(GPUScanout *scanout) {
   GPUFrameBuffer *fb = &scanout->frame_buffer;
 
   if (!fb || !fb->enabled || !fb->fb_addr) {
     log_error("%s found drm_framebuffer is not enabled yet");
-    *error = VIRTIO_GPU_RESP_ERR_UNSPEC;
     return;
   }
 
   struct drm_mode_destroy_dumb destory = {0};
   destory.handle = fb->drm_dumb_handle;
 
-  drmModeRmFB(scanout->card0_fd, fb->framebuffer_id);
-  munmap(fb->fb_addr, fb->drm_dumb_size);
+  drmModeRmFB(scanout->card0_fd, fb->fb_id);
+  if (fb->fb_addr != NULL) {
+    munmap(fb->fb_addr, fb->drm_dumb_size);
+  }
   drmIoctl(scanout->card0_fd, DRM_IOCTL_MODE_DESTROY_DUMB, &destory);
 
   log_debug("%s destoryed drm_framebuffer with id: %d, handle: %d, size: %d",
-            __func__, fb->framebuffer_id, fb->drm_dumb_handle,
-            fb->drm_dumb_size);
+            __func__, fb->fb_id, fb->drm_dumb_handle, fb->drm_dumb_size);
 
   // 保留其他信息
-  fb->framebuffer_id = 0;
+  fb->fb_id = 0;
   fb->drm_dumb_handle = 0;
   fb->drm_dumb_size = 0;
   fb->fb_addr = NULL;

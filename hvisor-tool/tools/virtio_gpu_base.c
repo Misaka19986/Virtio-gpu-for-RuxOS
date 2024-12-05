@@ -146,9 +146,15 @@ int virtio_gpu_init(VirtIODevice *vdev) {
   gdev->scanouts[0].encoder = encoder;
 
   log_debug("%s set scanout[0] card0_fd %d", __func__, drm_fd);
-  log_debug("%s set scanout[0] crtc %x", __func__, crtc);
-  log_debug("%s set scanout[0] connector %x", __func__, connector);
+  log_debug("%s set scanout[0] crtc %x with id %d", __func__, crtc, crtc->crtc_id);
+  log_debug("%s set scanout[0] connector %x with id %d", __func__, connector, connector->connector_id);
+  log_debug("%s get scanout[0] connector mode hdisplay: %d, vdisplay: %d",
+            __func__, connector->modes[0].hdisplay,
+            connector->modes[0].vdisplay);
   log_debug("%s set scanout[0] encoder %x", __func__, encoder);
+
+  gdev->scanouts[0].width = connector->modes[0].hdisplay;
+  gdev->scanouts[0].height = connector->modes[0].vdisplay;
 
   return 0;
 }
@@ -172,13 +178,6 @@ void virtio_gpu_close(VirtIODevice *vdev) {
   // 回收resource相关内存
   while (!TAILQ_EMPTY(&gdev->resource_list)) {
     GPUSimpleResource *temp = TAILQ_FIRST(&gdev->resource_list);
-    // TODO(root): free image
-    // if (temp->image) {
-    //   if (temp->image->data) {
-    //     free(temp->image->data);
-    //   }
-    //   free(temp->image);
-    // }
     TAILQ_REMOVE(&gdev->resource_list, temp, next);
     free(temp);
   }

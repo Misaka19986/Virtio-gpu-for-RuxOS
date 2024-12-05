@@ -37,9 +37,9 @@
 #define GPU_SUPPORTED_FEATURES ((1ULL << VIRTIO_F_VERSION_1))
 
 // scanout[0]的默认配置
-#define SCANOUT_DEFAULT_WIDTH 1024
+#define SCANOUT_DEFAULT_WIDTH 1280
 
-#define SCANOUT_DEFAULT_HEIGHT 720
+#define SCANOUT_DEFAULT_HEIGHT 800
 
 // 求最小值宏
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
@@ -106,7 +106,7 @@ typedef struct virtio_gpu_simple_resource {
 
 typedef struct virtio_gpu_framebuffer {
   // TODO: 双缓冲区
-  uint32_t framebuffer_id; // framebuffer的id
+  uint32_t fb_id; // framebuffer的id
   // TODO: format格式
   // format主要决定了每一个像素占多少字节
   // virtio_gpu_formats提供的都是4bytes per pixel大小的格式
@@ -311,7 +311,7 @@ void virtio_gpu_copy_and_flush(GPUScanout *scanout, GPUSimpleResource *res,
                                uint32_t *error);
 
 // 移除scanout的drm_framebuffer
-void virtio_gpu_remove_drm_framebuffer(GPUScanout *scanout, uint32_t *error);
+void virtio_gpu_remove_drm_framebuffer(GPUScanout *scanout);
 
 // 对应VIRTIO_GPU_CMD_SET_SCANOUT
 // 设置scanout的display参数，为scanout绑定resource
