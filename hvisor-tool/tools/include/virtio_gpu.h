@@ -1,5 +1,6 @@
 #ifndef _HVISOR_VIRTIO_GPU_H
 #define _HVISOR_VIRTIO_GPU_H
+#include "bits/pthreadtypes.h"
 #include "linux/types.h"
 #include "sys/queue.h"
 #include "virtio.h"
@@ -25,6 +26,9 @@
 // virtqueue中元素的最大数量
 #define VIRTQUEUE_GPU_MAX_SIZE 256
 
+// 处理的请求超过该数量后立刻kick前端
+#define VIRTIO_GPU_MAX_REQUEST_BEFORE_KICK 16
+
 // hvisor的virtio_gpu实现所支持的最大scanouts数量
 #define HVISOR_VIRTIO_GPU_MAX_SCANOUTS 1
 
@@ -34,7 +38,8 @@
 // 支持的virtio features
 // 可选VIRTIO_RING_F_INDIRECT_DESC和VIRTIO_RING_F_EVENT_IDX
 // 待支持VIRTIO_GPU_F_EDID、VIRTIO_GPU_F_RESOURCE_UUID、VIRTIO_GPU_F_RESOURCE_BLOB、VIRTIO_GPU_F_VIRGL、VIRTIO_GPU_F_CONTEXT_INIT
-#define GPU_SUPPORTED_FEATURES ((1ULL << VIRTIO_F_VERSION_1))
+#define GPU_SUPPORTED_FEATURES                                                 \
+  ((1ULL << VIRTIO_F_VERSION_1) | (1ULL << VIRTIO_RING_F_INDIRECT_DESC))
 
 // scanout[0]的默认配置
 #define SCANOUT_DEFAULT_WIDTH 1280
@@ -172,6 +177,11 @@ typedef struct virtio_gpu_dev {
   uint64_t hostmem;
   // 启用的scanout
   int enabled_scanout_bitmask;
+  // async
+  pthread_t gpu_thread;
+  pthread_cond_t gpu_cond;
+  pthread_mutex_t queue_mutex;
+  bool close;
 } GPUDev;
 
 typedef struct virtio_gpu_control_cmd {
@@ -182,7 +192,8 @@ typedef struct virtio_gpu_control_cmd {
   bool
       finished; // 表示当前cmd经处理后是否完成响应，如果没有则统一使用no_data响应
   uint32_t error;                           // 报错类型
-  TAILQ_ENTRY(virtio_gpu_control_cmd) next; // TODO: 异步请求处理
+  uint32_t from_queue;                      // 从哪个queue传来的请求
+  TAILQ_ENTRY(virtio_gpu_control_cmd) next; // 命令队列上的下一个cmd
 } GPUCommand;
 
 /*********************************************************************
@@ -207,7 +218,8 @@ int virtio_gpu_ctrl_notify_handler(VirtIODevice *vdev, VirtQueue *vq);
 int virtio_gpu_cursor_notify_handler(VirtIODevice *vdev, VirtQueue *vq);
 
 // 处理单个请求
-int virtio_gpu_handle_single_request(VirtIODevice *vdev, VirtQueue *vq);
+int virtio_gpu_handle_single_request(VirtIODevice *vdev, VirtQueue *vq,
+                                     uint32_t from);
 
 // 从iov拷贝请求控制结构体
 #define VIRTIO_GPU_FILL_CMD(iov, iov_cnt, out)                                 \
@@ -360,7 +372,12 @@ int virtio_gpu_create_mapping_iov(VirtIODevice *vdev, uint32_t nr_entries,
 void virtio_gpu_resource_detach_backing(VirtIODevice *vdev, GPUCommand *gcmd);
 
 // 根据control header处理请求
-void virtio_gpu_simple_process_cmd(struct iovec *iov, unsigned int iov_cnt,
-                                   uint16_t resp_idx, VirtIODevice *vdev);
+void virtio_gpu_simple_process_cmd(GPUCommand *gcmd, VirtIODevice *vdev);
+
+/*********************************************************************
+  virtio_gpu_async.c
+ */
+// 处理线程
+void *virtio_gpu_handler(void *vdev);
 
 #endif /* _HVISOR_VIRTIO_GPU_H */

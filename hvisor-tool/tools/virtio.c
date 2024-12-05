@@ -820,14 +820,15 @@ int virtio_handle_req(volatile struct device_req *req) {
 
   VirtIODevice *vdev = vdevs[i];
 
-  if (vdev->type == VirtioTNet)
+  if (vdev->type == VirtioTNet) {
     log_info("handling request to net from zone %d", vdev->zone_id);
-  else if (vdev->type == VirtioTBlock)
+  } else if (vdev->type == VirtioTBlock) {
     log_info("handling request to blk from zone %d", vdev->zone_id);
-  else if (vdev->type == VirtioTConsole)
+  } else if (vdev->type == VirtioTConsole) {
     log_info("handling request to console from zone %d", vdev->zone_id);
-  else if (vdev->type == VirtioTGPU)
+  } else if (vdev->type == VirtioTGPU) {
     log_info("handling request to gpu from zone %d", vdev->zone_id);
+  }
 
   uint64_t offs = req->address - vdev->base_addr;
 
