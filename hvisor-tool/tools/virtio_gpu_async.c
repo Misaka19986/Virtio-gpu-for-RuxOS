@@ -40,7 +40,7 @@ void *virtio_gpu_handler(void *dev) {
         // 已经处理了一定数量的请求，kick前端
         virtio_inject_irq(&vdev->vqs[gcmd->from_queue]);
         request_cnt = 0;
-        log_info("%s: processed request >= 16, kick frontend", __func__);
+        // log_info("%s: processed request >= 16, kick frontend", __func__);
       }
 
       free(gcmd);
@@ -54,7 +54,7 @@ void *virtio_gpu_handler(void *dev) {
       // 已经处理了请求但是任务队列为空，立刻kick前端
       virtio_inject_irq(&vdev->vqs[gcmd->from_queue]);
       request_cnt = 0;
-      log_info("%s: request queue empty, kick frontend", __func__);
+      // log_info("%s: request queue empty, kick frontend", __func__);
     }
 
     pthread_cond_wait(&gdev->gpu_cond, &gdev->queue_mutex);
