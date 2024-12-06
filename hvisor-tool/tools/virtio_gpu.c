@@ -29,16 +29,8 @@ void virtio_gpu_ctrl_response(VirtIODevice *vdev, GPUCommand *gcmd,
     log_error("%s cannot copy buffer to iov with correct size", __func__);
     // 继续返回，交由前端处理
   }
-
-  // 根据命令选择返回vq
-  int sel = GPU_CONTROL_QUEUE;
-
-  if (gcmd->control_header.type == VIRTIO_GPU_CMD_UPDATE_CURSOR ||
-      gcmd->control_header.type == VIRTIO_GPU_CMD_MOVE_CURSOR) {
-    sel = GPU_CURSOR_QUEUE;
-  }
-
-  update_used_ring(&vdev->vqs[sel], gcmd->resp_idx, resp_len);
+  
+  update_used_ring(&vdev->vqs[gcmd->from_queue], gcmd->resp_idx, resp_len);
 
   gcmd->finished = true;
 }
@@ -86,7 +78,7 @@ void virtio_gpu_get_edid(VirtIODevice *vdev, GPUCommand *gcmd) {
 void virtio_gpu_resource_create_2d(VirtIODevice *vdev, GPUCommand *gcmd) {
   log_debug("entering %s", __func__);
 
-  GPUSimpleResource *res;
+  GPUSimpleResource *res = NULL;
   GPUDev *gdev = vdev->dev;
   struct virtio_gpu_resource_create_2d create_2d;
 
@@ -777,72 +769,67 @@ void virtio_gpu_resource_detach_backing(VirtIODevice *vdev, GPUCommand *gcmd) {
   virtio_gpu_cleanup_mapping(gdev, res);
 }
 
-void virtio_gpu_simple_process_cmd(struct iovec *iov, unsigned int iov_cnt,
-                                   uint16_t resp_idx, VirtIODevice *vdev) {
+void virtio_gpu_simple_process_cmd(GPUCommand *gcmd, VirtIODevice *vdev) {
   log_debug("------ entering %s ------", __func__);
 
-  GPUCommand gcmd;
-  gcmd.resp_iov = iov;
-  gcmd.resp_iov_cnt = iov_cnt;
-  gcmd.resp_idx = resp_idx;
-  gcmd.error = 0;
-  gcmd.finished = false;
+  gcmd->error = 0;
+  gcmd->finished = false;
 
   // 先填充每个请求都有的cmd_hdr
-  VIRTIO_GPU_FILL_CMD(iov, iov_cnt, gcmd.control_header);
+  VIRTIO_GPU_FILL_CMD(gcmd->resp_iov, gcmd->resp_iov_cnt, gcmd->control_header);
 
   // 根据cmd_hdr的类型跳转到对应的处理函数
   /**********************************
    * 一般的2D渲染调用链是get_display_info->resource_create_2d->resource_attach_backing->set_scanout->get_display_info(确定是否设置成功)
    * ->transfer_to_host_2d->resource_flush->*重复transfer和flush*->结束
    */
-  switch (gcmd.control_header.type) {
+  switch (gcmd->control_header.type) {
   case VIRTIO_GPU_CMD_GET_DISPLAY_INFO:
-    virtio_gpu_get_display_info(vdev, &gcmd);
+    virtio_gpu_get_display_info(vdev, gcmd);
     break;
   case VIRTIO_GPU_CMD_GET_EDID:
-    virtio_gpu_get_edid(vdev, &gcmd);
+    virtio_gpu_get_edid(vdev, gcmd);
     break;
   case VIRTIO_GPU_CMD_RESOURCE_CREATE_2D:
-    virtio_gpu_resource_create_2d(vdev, &gcmd);
+    virtio_gpu_resource_create_2d(vdev, gcmd);
     break;
   case VIRTIO_GPU_CMD_RESOURCE_UNREF:
-    virtio_gpu_resource_unref(vdev, &gcmd);
+    virtio_gpu_resource_unref(vdev, gcmd);
     break;
   case VIRTIO_GPU_CMD_RESOURCE_FLUSH:
-    virtio_gpu_resource_flush(vdev, &gcmd);
+    virtio_gpu_resource_flush(vdev, gcmd);
     break;
   case VIRTIO_GPU_CMD_TRANSFER_TO_HOST_2D:
-    virtio_gpu_transfer_to_host_2d(vdev, &gcmd);
+    virtio_gpu_transfer_to_host_2d(vdev, gcmd);
     break;
   case VIRTIO_GPU_CMD_SET_SCANOUT:
-    virtio_gpu_set_scanout(vdev, &gcmd);
+    virtio_gpu_set_scanout(vdev, gcmd);
     break;
   case VIRTIO_GPU_CMD_RESOURCE_ATTACH_BACKING:
-    virtio_gpu_resource_attach_backing(vdev, &gcmd);
+    virtio_gpu_resource_attach_backing(vdev, gcmd);
     break;
   case VIRTIO_GPU_CMD_RESOURCE_DETACH_BACKING:
-    virtio_gpu_resource_detach_backing(vdev, &gcmd);
+    virtio_gpu_resource_detach_backing(vdev, gcmd);
     break;
   default:
     log_error("unknown request type");
-    gcmd.error = VIRTIO_GPU_RESP_ERR_UNSPEC;
+    gcmd->error = VIRTIO_GPU_RESP_ERR_UNSPEC;
     break;
   }
 
-  if (!gcmd.finished) {
+  if (!gcmd->finished) {
     // 如果没有直接返回有data的响应，那么检查是否产生错误并返回无data响应
-    if (gcmd.error) {
+    if (gcmd->error) {
       log_error("failed to handle virtio gpu request from zone %d, and request "
                 "type is %d, error type is %d",
-                vdev->zone_id, gcmd.control_header.type, gcmd.error);
+                vdev->zone_id, gcmd->control_header.type, gcmd->error);
     }
     virtio_gpu_ctrl_response_nodata(
-        vdev, &gcmd, gcmd.error ? gcmd.error : VIRTIO_GPU_RESP_OK_NODATA);
+        vdev, gcmd, gcmd->error ? gcmd->error : VIRTIO_GPU_RESP_OK_NODATA);
   }
 
   // 处理完毕，不需要iov
-  free(gcmd.resp_iov);
+  free(gcmd->resp_iov);
 
   log_debug("------ leaving %s ------", __func__);
 }
