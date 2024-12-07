@@ -1773,6 +1773,7 @@ version = "0.1.0"
 dependencies = [
  "axstd",
  "embedded-graphics",
+ "log",
 ]
 
 [[package]]

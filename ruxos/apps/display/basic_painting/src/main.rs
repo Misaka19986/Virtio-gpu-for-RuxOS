@@ -105,8 +105,12 @@ fn test_gpu() {
     let duration = start.elapsed();
     let fps = NUM_ITERATIONS as f64 / duration.as_secs_f64();
     println!(
-        "渲染 {} 次耗时: {:?}，FPS: {:.2}",
-        NUM_ITERATIONS, duration, fps
+        "draw {} times cost {:?}, FPS: {:.2}, total flush time: {:?}, averge flush time: {:?}",
+        NUM_ITERATIONS,
+        duration,
+        fps,
+        board.disp.final_flush_duration(),
+        board.disp.final_flush_duration() / NUM_ITERATIONS.try_into().unwrap()
     );
 }
 

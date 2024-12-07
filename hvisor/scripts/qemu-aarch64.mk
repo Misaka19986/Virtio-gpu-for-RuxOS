@@ -15,7 +15,7 @@ QEMU_ARGS += -global arm-smmuv3.stage=2
 
 # QEMU_ARGS += -d int
 
-QEMU_ARGS += -cpu cortex-a57
+QEMU_ARGS += -cpu cortex-a72
 QEMU_ARGS += -smp 4
 QEMU_ARGS += -m 4G
 QEMU_ARGS += -nographic

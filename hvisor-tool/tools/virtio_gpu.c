@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
+#include <time.h>
 #include <xf86drm.h>
 #include <xf86drmMode.h>
 
@@ -29,7 +30,7 @@ void virtio_gpu_ctrl_response(VirtIODevice *vdev, GPUCommand *gcmd,
     log_error("%s cannot copy buffer to iov with correct size", __func__);
     // 继续返回，交由前端处理
   }
-  
+
   update_used_ring(&vdev->vqs[gcmd->from_queue], gcmd->resp_idx, resp_len);
 
   gcmd->finished = true;
@@ -778,6 +779,11 @@ void virtio_gpu_simple_process_cmd(GPUCommand *gcmd, VirtIODevice *vdev) {
   // 先填充每个请求都有的cmd_hdr
   VIRTIO_GPU_FILL_CMD(gcmd->resp_iov, gcmd->resp_iov_cnt, gcmd->control_header);
 
+  /// time
+  struct timespec start;
+  struct timespec end;
+  clock_gettime(CLOCK_MONOTONIC, &start);
+
   // 根据cmd_hdr的类型跳转到对应的处理函数
   /**********************************
    * 一般的2D渲染调用链是get_display_info->resource_create_2d->resource_attach_backing->set_scanout->get_display_info(确定是否设置成功)
@@ -827,6 +833,19 @@ void virtio_gpu_simple_process_cmd(GPUCommand *gcmd, VirtIODevice *vdev) {
     virtio_gpu_ctrl_response_nodata(
         vdev, gcmd, gcmd->error ? gcmd->error : VIRTIO_GPU_RESP_OK_NODATA);
   }
+
+  /// time
+  clock_gettime(CLOCK_MONOTONIC, &end);
+
+  long seconds = end.tv_sec - start.tv_sec;
+  long nanoseconds = end.tv_nsec - start.tv_nsec;
+  double milliseconds = (seconds * 1000) + (nanoseconds / 1e6);
+
+  double time_taken =
+      end.tv_sec - start.tv_sec + (end.tv_nsec - start.tv_nsec) / 1e9;
+
+  log_info("process request type %d for %f ms", gcmd->control_header.type,
+           time_taken);
 
   // 处理完毕，不需要iov
   free(gcmd->resp_iov);

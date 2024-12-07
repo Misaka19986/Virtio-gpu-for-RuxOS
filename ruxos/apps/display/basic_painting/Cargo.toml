@@ -7,5 +7,8 @@ authors = ["Shiping Yuan <robert_yuan@pku.edu.com>"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-axstd = { path = "../../../ulib/axstd", features = ["display"], optional = true }
+axstd = { path = "../../../ulib/axstd", features = [
+    "display",
+], optional = true }
+log = "0.4"
 embedded-graphics = "0.8"
