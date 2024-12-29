@@ -90,9 +90,9 @@ int virtio_gpu_init(VirtIODevice *vdev) {
   int drm_fd = 0;
 
   // 打开card0
-  drm_fd = open("/dev/dri/card1", O_RDWR | O_CLOEXEC);
+  drm_fd = open("/dev/dri/card0", O_RDWR | O_CLOEXEC);
   if (drm_fd < 0) {
-    log_error("%s failed to open /dev/dri/card1", __func__);
+    log_error("%s failed to open /dev/dri/card0", __func__);
     return -1;
   }
 
