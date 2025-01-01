@@ -839,10 +839,10 @@ void virtio_gpu_simple_process_cmd(GPUCommand *gcmd, VirtIODevice *vdev) {
 
   long seconds = end.tv_sec - start.tv_sec;
   long nanoseconds = end.tv_nsec - start.tv_nsec;
-  double milliseconds = (seconds * 1000) + (nanoseconds / 1e6);
+  double milliseconds = ((double)seconds * 1000) + ((double)nanoseconds / 1e6);
 
   double time_taken =
-      end.tv_sec - start.tv_sec + (end.tv_nsec - start.tv_nsec) / 1e9;
+      (double)(end.tv_sec - start.tv_sec) + (double)(end.tv_nsec - start.tv_nsec) / 1e9;
 
   log_info("process request type %d for %f ms", gcmd->control_header.type,
            time_taken);

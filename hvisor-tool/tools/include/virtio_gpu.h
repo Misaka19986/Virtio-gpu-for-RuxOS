@@ -50,26 +50,16 @@
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 
 // virtio_gpu_formats和drm格式转换
-#define VIRTIO_GPU_FORMAT_TO_DRM_FORMAT(format)                                 \
-  ((format == VIRTIO_GPU_FORMAT_X8R8G8B8_UNORM)                                 \
-       ? DRM_FORMAT_XRGB8888                                                    \
-       : (format == VIRTIO_GPU_FORMAT_X8B8G8R8_UNORM)                           \
-             ? DRM_FORMAT_XBGR8888                                              \
-             : (format == VIRTIO_GPU_FORMAT_R8G8B8X8_UNORM)                     \
-                   ? DRM_FORMAT_RGBX8888                                        \
-                   : (format == VIRTIO_GPU_FORMAT_B8G8R8X8_UNORM)               \
-                         ? DRM_FORMAT_BGRX8888                                  \
-                         : (format == VIRTIO_GPU_FORMAT_A8R8G8B8_UNORM)         \
-                               ? DRM_FORMAT_ARGB8888                            \
-                               : (format == VIRTIO_GPU_FORMAT_A8B8G8R8_UNORM)   \
-                                     ? DRM_FORMAT_ABGR8888                      \
-                                     : (format ==                               \
-                                        VIRTIO_GPU_FORMAT_R8G8B8A8_UNORM)       \
-                                           ? DRM_FORMAT_RGBA8888                \
-                                           : (format ==                         \
-                                              VIRTIO_GPU_FORMAT_B8G8R8A8_UNORM) \
-                                                 ? DRM_FORMAT_BGRA8888          \
-                                                 : 0 /* 未知格式 */)
+#define VIRTIO_GPU_FORMAT_TO_DRM_FORMAT(format)                                \
+  ((format == VIRTIO_GPU_FORMAT_X8R8G8B8_UNORM)   ? DRM_FORMAT_XRGB8888        \
+   : (format == VIRTIO_GPU_FORMAT_X8B8G8R8_UNORM) ? DRM_FORMAT_XBGR8888        \
+   : (format == VIRTIO_GPU_FORMAT_R8G8B8X8_UNORM) ? DRM_FORMAT_RGBX8888        \
+   : (format == VIRTIO_GPU_FORMAT_B8G8R8X8_UNORM) ? DRM_FORMAT_BGRX8888        \
+   : (format == VIRTIO_GPU_FORMAT_A8R8G8B8_UNORM) ? DRM_FORMAT_ARGB8888        \
+   : (format == VIRTIO_GPU_FORMAT_A8B8G8R8_UNORM) ? DRM_FORMAT_ABGR8888        \
+   : (format == VIRTIO_GPU_FORMAT_R8G8B8A8_UNORM) ? DRM_FORMAT_RGBA8888        \
+   : (format == VIRTIO_GPU_FORMAT_B8G8R8A8_UNORM) ? DRM_FORMAT_BGRA8888        \
+                                                  : 0 /* 未知格式 */)
 
 /*********************************************************************
     结构体
@@ -379,5 +369,28 @@ void virtio_gpu_simple_process_cmd(GPUCommand *gcmd, VirtIODevice *vdev);
  */
 // 处理线程
 void *virtio_gpu_handler(void *vdev);
+
+/*********************************************************************
+  virtio_gpu_gl.c
+ */
+void virtio_gpu_ctx_create();
+
+void virtio_gpu_ctx_destory();
+
+void virtio_gpu_ctx_attach_resource();
+
+void virtio_gpu_ctx_detach_resource();
+
+void virtio_gpu_resource_create_3d();
+
+void virtio_gpu_transfer_to_host_3d();
+
+void virtio_gpu_transfer_from_host_3d();
+
+void virtio_gpu_submit_3d();
+
+void virtio_gpu_resource_map_blob();
+
+void virtio_gpu_resource_unmap_blob();
 
 #endif /* _HVISOR_VIRTIO_GPU_H */
