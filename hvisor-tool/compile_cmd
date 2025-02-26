@@ -1,1 +1,2 @@
 make ARCH=arm64 LOG=LOG_DEBUG KDIR=/usr/local/bin/linux all
+make ARCH=arm64 LOG=LOG_INFO KDIR=/usr/local/bin/linux all

@@ -23,10 +23,12 @@ use embedded_graphics::{
     primitives::{Circle, PrimitiveStyle, Rectangle, Triangle},
     text::{Alignment, Text},
 };
+use std::{println, time::Instant};
 
-const INIT_X: i32 = 80;
-const INIT_Y: i32 = 400;
-const RECT_SIZE: u32 = 150;
+const INIT_X: i32 = 100;
+const INIT_Y: i32 = 100;
+const RECT_SIZE: u32 = 50;
+const NUM_ITERATIONS: usize = 1000; // 增加渲染次数到1000
 
 pub struct DrawingBoard {
     disp: Display,
@@ -49,25 +51,25 @@ impl DrawingBoard {
 
     fn paint(&mut self) {
         Rectangle::with_center(self.latest_pos, Size::new(RECT_SIZE, RECT_SIZE))
-            .into_styled(PrimitiveStyle::with_stroke(Rgb888::RED, 10))
+            .into_styled(PrimitiveStyle::with_stroke(Rgb888::RED, 3))
             .draw(&mut self.disp)
             .ok();
-        Circle::new(self.latest_pos + Point::new(-70, -300), 150)
+        Circle::new(self.latest_pos + Point::new(-50, -100), 30)
             .into_styled(PrimitiveStyle::with_fill(Rgb888::BLUE))
             .draw(&mut self.disp)
             .ok();
         Triangle::new(
-            self.latest_pos + Point::new(0, 150),
-            self.latest_pos + Point::new(80, 200),
-            self.latest_pos + Point::new(-120, 300),
+            self.latest_pos + Point::new(0, 30),
+            self.latest_pos + Point::new(40, 80),
+            self.latest_pos + Point::new(-60, 120),
         )
-        .into_styled(PrimitiveStyle::with_stroke(Rgb888::GREEN, 10))
+        .into_styled(PrimitiveStyle::with_stroke(Rgb888::GREEN, 3))
         .draw(&mut self.disp)
         .ok();
         let text = "Ruxos";
         Text::with_alignment(
             text,
-            self.latest_pos + Point::new(0, 300),
+            self.latest_pos + Point::new(0, 80),
             MonoTextStyle::new(&FONT_10X20, Rgb888::YELLOW),
             Alignment::Center,
         )
@@ -79,11 +81,37 @@ impl DrawingBoard {
 fn test_gpu() {
     let mut board = DrawingBoard::new();
     board.disp.clear(Rgb888::BLACK).unwrap();
-    for _ in 0..5 {
-        board.latest_pos.x += RECT_SIZE as i32 + 20;
+
+    let start = Instant::now();
+
+    for _ in 0..NUM_ITERATIONS {
+        if board.latest_pos.x + RECT_SIZE as i32 + 20 > 1280 {
+            board.latest_pos.x = INIT_X;
+            board.latest_pos.y += RECT_SIZE as i32 + 50; // 增加行高，避免重叠
+        } else {
+            board.latest_pos.x += RECT_SIZE as i32 + 20;
+        }
+
+        // 保证不会超过屏幕的垂直方向尺寸
+        if board.latest_pos.y + RECT_SIZE as i32 + 120 > 800 {
+            board.latest_pos.x = INIT_X;
+            board.latest_pos.y = INIT_Y; // 重置到初始位置
+        }
+
         board.paint();
         board.disp.flush();
     }
+
+    let duration = start.elapsed();
+    let fps = NUM_ITERATIONS as f64 / duration.as_secs_f64();
+    println!(
+        "draw {} times cost {:?}, FPS: {:.2}, total flush time: {:?}, averge flush time: {:?}",
+        NUM_ITERATIONS,
+        duration,
+        fps,
+        board.disp.final_flush_duration(),
+        board.disp.final_flush_duration() / NUM_ITERATIONS.try_into().unwrap()
+    );
 }
 
 #[cfg_attr(feature = "axstd", no_mangle)]

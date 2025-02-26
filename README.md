@@ -25,7 +25,7 @@ wget https://download.qemu.org/qemu-8.2.7.tar.xz
 tar xvJf qemu-8.2.7.tar.xz
 cd qemu-8.2.7
 #生成设置文件
-./configure --enable-kvm --enable-slirp --enable-debug --target-list=aarch64-softmmu,x86_64-softmmu
+./configure --enable-kvm --enable-slirp --enable-debug --target-list=aarch64-softmmu,x86_64-softmmu --enable-opengl --enable-gtk
 #编译
 make -j$(nproc)
 ```
@@ -253,6 +253,8 @@ mkdir install
 ```Makefile
 -I/usr/aarch64-linux-gnu/include -I/usr/aarch64-linux-gnu/include/libdrm -L/usr/aarch64-linux-gnu/lib -ldrm
 ```
+
+### 3D支持使用的VirGL的编译
 
 ### 语言服务器和VSC插件的使用
 - **Rust**

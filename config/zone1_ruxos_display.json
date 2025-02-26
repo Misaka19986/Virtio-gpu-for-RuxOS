@@ -62,11 +62,12 @@
             "max_peers": 2
         }
     ],
-    "kernel_filepath": "./draw_map_aarch64-qemu-virt.bin",
+    "kernel_filepath": "./basic_painting_aarch64-qemu-virt.bin",
     "dtb_filepath": "./qemu-ruxos.dtb",
     "kernel_load_paddr": "0x50080000",
     "dtb_load_paddr": "0x50000000",
     "entry_point": "0x40080000",
+    "kernel_args": "",
     "arch_config": {
         "gicd_base": "0x8000000",
         "gicd_size": "0x10000",

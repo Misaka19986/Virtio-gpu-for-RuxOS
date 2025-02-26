@@ -15,7 +15,7 @@ QEMU_ARGS += -global arm-smmuv3.stage=2
 
 # QEMU_ARGS += -d int
 
-QEMU_ARGS += -cpu cortex-a57
+QEMU_ARGS += -cpu cortex-a72
 QEMU_ARGS += -smp 4
 QEMU_ARGS += -m 4G
 QEMU_ARGS += -nographic
@@ -57,9 +57,11 @@ QEMU_ARGS += -device virtio-net-pci,netdev=net1,disable-legacy=on,disable-modern
 # QEMU_ARGS += -netdev type=user,id=net3
 # QEMU_ARGS += -device virtio-net-pci,netdev=net3,disable-legacy=on,disable-modern=off,iommu_platform=on
 
+# QEMU_ARGS += -vga std
+# QEMU_ARGS += -enable-kvm
 QEMU_ARGS += -device virtio-gpu,addr=06,iommu_platform=on
-QEMU_ARGS += -display sdl
-# QEMU_ARGS += -device cirrus-vga
+QEMU_ARGS += -display sdl,gl=on
+# QEMU_ARGS += -display gtk,gl=on,grab-on-hover=off
 
 $(hvisor_bin): elf
 	@if ! command -v mkimage > /dev/null; then \
