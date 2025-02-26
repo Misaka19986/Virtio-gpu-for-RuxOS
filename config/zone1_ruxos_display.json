@@ -67,6 +67,7 @@
     "kernel_load_paddr": "0x50080000",
     "dtb_load_paddr": "0x50000000",
     "entry_point": "0x40080000",
+    "kernel_args": "",
     "arch_config": {
         "gicd_base": "0x8000000",
         "gicd_size": "0x10000",
