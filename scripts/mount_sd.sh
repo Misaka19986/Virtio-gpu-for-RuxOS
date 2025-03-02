@@ -2,23 +2,17 @@
 
 TARGET=${1:-all}
 CONFIG=../config
-VIRTDISK=../hvisor/images/aarch64/virtdisk
 KERNEL=../hvisor/images/aarch64/kernel
 HVISOR_TOOL=../hvisor-tool
-ROOTFS=../hvisor/images/aarch64/virtdisk/rootfs
+ROOTFS=/mnt/sd
 DEVICETREE=../hvisor/images/aarch64/devicetree
 ZONEBASE=$ROOTFS/home/arm64
 RUXOS=../ruxos
 SCRIPTS=./
 
-if [ ! -d "$VIRTDISK/rootfs" ]; then
-    echo "mkdir rootfs"
-    mkdir -p "$VIRTDISK/rootfs"
-fi
-
 # 挂载镜像
 cp /etc/resolv.conf $ROOTFS/etc/resolv.conf
-mount -t ext4 $VIRTDISK/rootfs1.ext4 $ROOTFS
+mount -t ext4 /dev/sdd1 $ROOTFS
 mount -t proc /proc $ROOTFS/proc
 mount -t sysfs /sys $ROOTFS/sys
 mount -o bind /dev $ROOTFS/dev

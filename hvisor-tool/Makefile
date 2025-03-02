@@ -1,4 +1,4 @@
-KDIR ?= /usr/local/bin/linux
+KDIR ?= /root/ok8mp-linux5.4.70-sdk/OK8MP-linux-kernel
 DEV ?= /dev/sda1
 ARCH ?= arm64
 LOG ?= LOG_INFO

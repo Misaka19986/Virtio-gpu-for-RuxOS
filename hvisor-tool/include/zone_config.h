@@ -1,17 +1,17 @@
 #ifndef __HVISOR_ZONE_CONFIG_H
 #define __HVISOR_ZONE_CONFIG_H
-#include "ivc.h"
 #include "def.h"
+#include "ivc.h"
 
-#define MEM_TYPE_RAM     0
-#define MEM_TYPE_IO      1
-#define MEM_TYPE_VIRTIO  2
+#define MEM_TYPE_RAM 0
+#define MEM_TYPE_IO 1
+#define MEM_TYPE_VIRTIO 2
 
-#define CONFIG_MAX_MEMORY_REGIONS  16
-#define CONFIG_MAX_INTERRUPTS      32
-#define CONFIG_MAX_ZONES           32
-#define CONFIG_NAME_MAXLEN         32
-#define CONFIG_MAX_PCI_DEV         16
+#define CONFIG_MAX_MEMORY_REGIONS 16
+#define CONFIG_MAX_INTERRUPTS 32
+#define CONFIG_MAX_ZONES 32
+#define CONFIG_NAME_MAXLEN 32
+#define CONFIG_MAX_PCI_DEV 16
 
 #define IVC_PROTOCOL_USER 0x0
 #define IVC_PROTOCOL_HVISOR 0x01
@@ -44,11 +44,18 @@ typedef struct pci_config pci_config_t;
 #ifdef ARM64
 struct arch_zone_config {
     __u64 gicd_base;
-    __u64 gicr_base;
     __u64 gicd_size;
+    __u64 gicr_base;
     __u64 gicr_size;
     __u64 gits_base;
     __u64 gits_size;
+    __u64 gicc_base;
+    __u64 gicc_offset;
+    __u64 gicc_size;
+    __u64 gich_base;
+    __u64 gich_size;
+    __u64 gicv_base;
+    __u64 gicv_size;
 };
 #endif
 
@@ -56,6 +63,14 @@ struct arch_zone_config {
 struct arch_zone_config {
     __u64 plic_base;
     __u64 plic_size;
+    __u64 aplic_base;
+    __u64 aplic_size;
+};
+#endif
+
+#ifdef LOONGARCH64
+struct arch_zone_config {
+    __u64 dummy;
 };
 #endif
 
@@ -82,7 +97,7 @@ struct zone_config {
     __u32 interrupts[CONFIG_MAX_INTERRUPTS];
     __u32 num_ivc_configs;
     ivc_config_t ivc_configs[CONFIG_MAX_IVC_CONFIGS];
-    
+
     __u64 entry_point;
     __u64 kernel_load_paddr;
     __u64 kernel_size;
