@@ -1,3 +1,4 @@
 make ARCH=arm64 LOG=LOG_DEBUG KDIR=/usr/local/bin/linux all
 make ARCH=arm64 LOG=LOG_INFO KDIR=/usr/local/bin/linux all
 make ARCH=arm64 LOG=LOG_DEBUG KDIR=/root/ok8mp-linux5.4.70-sdk/OK8MP-linux-kernel all
+make ARCH=arm64 LOG=LOG_INFO KDIR=/root/ok8mp-linux5.4.70-sdk/OK8MP-linux-kernel all

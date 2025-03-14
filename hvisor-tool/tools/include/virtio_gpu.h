@@ -44,9 +44,9 @@
     ((1ULL << VIRTIO_F_VERSION_1) | VIRTIO_RING_F_INDIRECT_DESC)
 
 // Default configuration for scanout[0]
-#define SCANOUT_DEFAULT_WIDTH 1280
+#define SCANOUT_DEFAULT_WIDTH 1920
 
-#define SCANOUT_DEFAULT_HEIGHT 720
+#define SCANOUT_DEFAULT_HEIGHT 1080
 
 // Macro to find the minimum value
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
