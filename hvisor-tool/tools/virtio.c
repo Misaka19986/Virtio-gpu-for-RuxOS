@@ -356,23 +356,29 @@ void virtqueue_enable_notify(VirtQueue *vq) {
 
 void virtqueue_set_desc_table(VirtQueue *vq) {
     int zone_id = vq->dev->zone_id;
-    log_debug("zone %d set dev %s desc table ipa at %#x", zone_id,
-              virtio_device_type_to_string(vq->dev->type), vq->desc_table_addr);
-    vq->desc_table = (VirtqDesc *)get_virt_addr(vq->desc_table_addr, zone_id);
+    void *addr = get_virt_addr(vq->desc_table_addr, zone_id);
+    log_debug("zone %d set dev %s desc table ipa at %#x, at zone0's %#x ",
+              zone_id, virtio_device_type_to_string(vq->dev->type),
+              vq->desc_table_addr, addr);
+    vq->desc_table = (VirtqDesc *)addr;
 }
 
 void virtqueue_set_avail(VirtQueue *vq) {
     int zone_id = vq->dev->zone_id;
-    log_debug("zone %d set dev %s avail ring ipa at %#x", zone_id,
-              virtio_device_type_to_string(vq->dev->type), vq->avail_addr);
-    vq->avail_ring = (VirtqAvail *)get_virt_addr(vq->avail_addr, zone_id);
+    void *addr = get_virt_addr(vq->avail_addr, zone_id);
+    log_debug("zone %d set dev %s avail ring ipa at %#x, at zone0's %#x",
+              zone_id, virtio_device_type_to_string(vq->dev->type),
+              vq->avail_addr, addr);
+    vq->avail_ring = (VirtqAvail *)addr;
 }
 
 void virtqueue_set_used(VirtQueue *vq) {
     int zone_id = vq->dev->zone_id;
-    log_debug("zone %d set dev %s used ring ipa at %#x", zone_id,
-              virtio_device_type_to_string(vq->dev->type), vq->used_addr);
-    vq->used_ring = (VirtqUsed *)get_virt_addr(vq->used_addr, zone_id);
+    void *addr = get_virt_addr(vq->used_addr, zone_id);
+    log_debug("zone %d set dev %s used ring ipa at %#x, at zone0's %#x",
+              zone_id, virtio_device_type_to_string(vq->dev->type),
+              vq->used_addr, addr);
+    vq->used_ring = (VirtqUsed *)addr;
 }
 
 // record one descriptor to iov.
@@ -1140,6 +1146,11 @@ int virtio_start_from_json(char *json_path) {
                 err = -1;
                 goto err_out;
             }
+
+            log_debug(
+                "zone %d, mem region %d, zone0_ipa is %x, zonex_ipa is %x, "
+                "virt_addr is %x, mem_size is %x",
+                zone_id, j, zone0_ipa, zonex_ipa, virt_addr, mem_size);
             zone_mem[zone_id][j][VIRT_ADDR] = virt_addr;
             zone_mem[zone_id][j][ZONE0_IPA] = zone0_ipa;
             zone_mem[zone_id][j][ZONEX_IPA] = zonex_ipa;

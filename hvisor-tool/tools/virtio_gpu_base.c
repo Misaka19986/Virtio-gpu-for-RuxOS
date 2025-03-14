@@ -92,7 +92,7 @@ int virtio_gpu_init(VirtIODevice *vdev) {
     int drm_fd = 0;
 
     // Open card0
-    drm_fd = open("/dev/dri/card0", O_RDWR | O_CLOEXEC);
+    drm_fd = open("/dev/dri/card1", O_RDWR | O_CLOEXEC);
     if (drm_fd < 0) {
         log_error("%s failed to open /dev/dri/card0", __func__);
         return -1;
@@ -112,6 +112,8 @@ int virtio_gpu_init(VirtIODevice *vdev) {
     for (int i = 0; i < res->count_connectors; ++i) {
         connector = drmModeGetConnector(drm_fd, res->connectors[i]);
         if (connector->connection == DRM_MODE_CONNECTED) {
+            log_debug("%s found a connector: %d", __func__,
+                      connector->connector_id);
             break;
         }
         drmModeFreeConnector(connector);
@@ -125,24 +127,47 @@ int virtio_gpu_init(VirtIODevice *vdev) {
     }
 
     // Get encoder
+    log_debug("%s get encoder with id %d in first try", __func__,
+              connector->encoder_id);
     drmModeEncoder *encoder = drmModeGetEncoder(drm_fd, connector->encoder_id);
     if (!encoder) {
-        log_error("%s cannot get encoder", __func__);
-        drmModeFreeConnector(connector);
-        drmModeFreeResources(res);
-        close(drm_fd);
-        return -1;
+        for (int i = 0; i < connector->count_encoders; ++i) {
+            encoder = drmModeGetEncoder(drm_fd, connector->encoders[i]);
+            if (encoder) {
+                log_debug("%s found an encoder: %d", __func__,
+                          encoder->encoder_id);
+                break;
+            }
+        }
+        if (!encoder) {
+            log_error("%s cannot get an encoder", __func__);
+            drmModeFreeConnector(connector);
+            drmModeFreeResources(res);
+            close(drm_fd);
+            return -1;
+        }
     }
 
     // Get CRTC
+    log_debug("%s get CRTC with id %d in first try", __func__,
+              encoder->crtc_id);
     drmModeCrtc *crtc = drmModeGetCrtc(drm_fd, encoder->crtc_id);
     if (!crtc) {
-        log_error("%s cannot get CRTC", __func__);
-        drmModeFreeEncoder(encoder);
-        drmModeFreeConnector(connector);
-        drmModeFreeResources(res);
-        close(drm_fd);
-        return -1;
+        for (int i = 0; i < res->count_crtcs; ++i) {
+            crtc = drmModeGetCrtc(drm_fd, res->crtcs[i]);
+            if (crtc) {
+                log_debug("%s found a CRTC: %d", __func__, crtc->crtc_id);
+                break;
+            }
+        }
+        if (!crtc) {
+            log_error("%s cannot get a CRTC", __func__);
+            drmModeFreeEncoder(encoder);
+            drmModeFreeConnector(connector);
+            drmModeFreeResources(res);
+            close(drm_fd);
+            return -1;
+        }
     }
     // drmModeModeInfo mode = connector->modes[0];
 

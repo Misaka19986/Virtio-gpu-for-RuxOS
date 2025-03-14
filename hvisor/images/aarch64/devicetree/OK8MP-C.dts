@@ -1525,7 +1525,7 @@
 				clock-names = "ipg\0per";
 				dmas = <0x22 0x1c 0x04 0x00 0x22 0x1d 0x04 0x00>;
 				dma-names = "rx\0tx";
-				status = "disabled";
+				status = "okay";
 			};
 
 			mu@30aa0000 {

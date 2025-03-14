@@ -36,7 +36,7 @@ impl HvConfigMemoryRegion {
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct HvPciConfig{
+pub struct HvPciConfig {
     pub ecam_base: u64,
     pub ecam_size: u64,
     pub io_base: u64,
@@ -103,14 +103,14 @@ impl HvZoneConfig {
         ivc_configs: [HvIvcConfig; CONFIG_MAX_IVC_CONGIGS],
         entry_point: u64,
         kernel_load_paddr: u64,
-        kernel_size:u64,
-        dtb_load_paddr:u64,
+        kernel_size: u64,
+        dtb_load_paddr: u64,
         dtb_size: u64,
         name: [u8; CONFIG_NAME_MAXLEN],
         arch: HvArchZoneConfig,
         pci: HvPciConfig,
         num_pci_devs: u64,
-        alloc_pci_devs: [u64; CONFIG_MAX_PCI_DEV]
+        alloc_pci_devs: [u64; CONFIG_MAX_PCI_DEV],
     ) -> Self {
         Self {
             zone_id,
@@ -130,7 +130,7 @@ impl HvZoneConfig {
             arch_config: arch,
             pci_config: pci,
             num_pci_devs: num_pci_devs,
-            alloc_pci_devs: alloc_pci_devs
+            alloc_pci_devs: alloc_pci_devs,
         }
     }
 

@@ -46,7 +46,7 @@
 // Default configuration for scanout[0]
 #define SCANOUT_DEFAULT_WIDTH 1280
 
-#define SCANOUT_DEFAULT_HEIGHT 800
+#define SCANOUT_DEFAULT_HEIGHT 720
 
 // Macro to find the minimum value
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
