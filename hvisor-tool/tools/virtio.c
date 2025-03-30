@@ -1,4 +1,5 @@
 #include "virtio.h"
+#include "bits/time.h"
 #include "cJSON.h"
 #include "hvisor.h"
 #include "log.h"
@@ -904,7 +905,10 @@ void handle_virtio_requests() {
     virtio_bridge->need_wakeup = 1;
 
     int signal_count = 0, proc_count = 0;
-    unsigned long long count = 0;
+    struct timespec last_req_time;
+    struct timespec current_time;
+    clock_gettime(CLOCK_MONOTONIC, &last_req_time);
+
     for (;;) {
         log_warn("signal_count is %d, proc_count is %d", signal_count,
                  proc_count);
@@ -919,7 +923,7 @@ void handle_virtio_requests() {
         }
         while (1) {
             if (!is_queue_empty(req_front, virtio_bridge->req_rear)) {
-                count = 0;
+                clock_gettime(CLOCK_MONOTONIC, &last_req_time);
                 proc_count++;
                 req = &virtio_bridge->req_list[req_front];
                 virtio_bridge->need_wakeup = 0;
@@ -928,10 +932,13 @@ void handle_virtio_requests() {
                 virtio_bridge->req_front = req_front;
                 write_barrier();
             } else {
-                count++;
-                if (count < 10000000)
+                clock_gettime(CLOCK_MONOTONIC, &current_time);
+                long long time_diff_ns =
+                    (current_time.tv_sec - last_req_time.tv_sec) * 1000000000 +
+                    (current_time.tv_nsec - last_req_time.tv_nsec);
+                if (time_diff_ns < 30000000) {
                     continue;
-                count = 0;
+                }
                 virtio_bridge->need_wakeup = 1;
                 write_barrier();
                 nanosleep(&timeout, NULL);

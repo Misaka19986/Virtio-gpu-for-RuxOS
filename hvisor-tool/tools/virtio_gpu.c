@@ -789,10 +789,15 @@ void virtio_gpu_simple_process_cmd(GPUCommand *gcmd, VirtIODevice *vdev) {
     gcmd->error = 0;
     gcmd->finished = false;
 
+    /// time
+    // struct timespec start;
+    // struct timespec end;
+    // clock_gettime(CLOCK_MONOTONIC, &start);
+
     // First fill in the cmd_hdr that each request has
     VIRTIO_GPU_FILL_CMD(gcmd->resp_iov, gcmd->resp_iov_cnt,
                         gcmd->control_header);
-
+    
     // Jump to the corresponding processing function according to the type of
     // cmd_hdr
     /**********************************
@@ -847,6 +852,15 @@ void virtio_gpu_simple_process_cmd(GPUCommand *gcmd, VirtIODevice *vdev) {
         virtio_gpu_ctrl_response_nodata(
             vdev, gcmd, gcmd->error ? gcmd->error : VIRTIO_GPU_RESP_OK_NODATA);
     }
+
+    /// time
+    // clock_gettime(CLOCK_MONOTONIC, &end);
+
+    // double time_taken =
+    //     end.tv_sec - start.tv_sec + (end.tv_nsec - start.tv_nsec) / 1e9;
+
+    // log_info("process request type %d for %f ms", gcmd->control_header.type,
+    //          time_taken);
 
     // Processing is complete, no need for iov
     free(gcmd->resp_iov);

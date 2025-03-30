@@ -1,7 +1,8 @@
 #!/bin/sh
 
-rm ./nohup.out
-rm ./log.txt
+# rm ./nohup.out
+# rm ./log.txt
+modetest
 
 insmod hvisor.ko
 

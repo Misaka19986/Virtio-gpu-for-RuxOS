@@ -25,7 +25,7 @@ wget https://download.qemu.org/qemu-8.2.7.tar.xz
 tar xvJf qemu-8.2.7.tar.xz
 cd qemu-8.2.7
 #生成设置文件
-./configure --enable-kvm --enable-slirp --enable-debug --target-list=aarch64-softmmu,x86_64-softmmu --enable-opengl --enable-gtk
+./configure --enable-kvm --enable-slirp --enable-debug --target-list=aarch64-softmmu,x86_64-softmmu
 #编译
 make -j$(nproc)
 ```

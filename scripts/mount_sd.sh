@@ -19,8 +19,8 @@ mount -o bind /dev $ROOTFS/dev
 mount -o bind /dev/pts $ROOTFS/dev/pts
 
 # 拷贝hvisor-tool内核模块以及命令行工具
-cp $HVISOR_TOOL/driver/hvisor.ko $ZONEBASE
-cp $HVISOR_TOOL/tools/hvisor $ZONEBASE
+# cp $HVISOR_TOOL/driver/hvisor.ko $ZONEBASE
+# cp $HVISOR_TOOL/tools/hvisor $ZONEBASE
 
 # 拷贝所有配置
 # 递归遍历CONFIG路径，把其中的每个文件拷贝到rootfs

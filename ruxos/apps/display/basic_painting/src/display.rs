@@ -10,63 +10,25 @@
 use embedded_graphics::pixelcolor::Rgb888;
 use embedded_graphics::prelude::{RgbColor, Size};
 use embedded_graphics::{draw_target::DrawTarget, prelude::OriginDimensions};
-use log::info;
 
 use std::os::arceos::api::display as api;
-use std::time::{Duration, Instant};
 
 pub struct Display {
     size: Size,
     fb: &'static mut [u8],
-    total_flush_duration: Duration, // 总耗时
-    flush_count: u32,               // flush计数器
-    final_flush_duration: Duration,
 }
 
 impl Display {
     pub fn new() -> Self {
-        let start = Instant::now();
-
         let info = api::ax_framebuffer_info();
-
-        let duration = start.elapsed();
-
-        info!("get framebuffer cost {:?}", duration);
-
         let fb =
             unsafe { core::slice::from_raw_parts_mut(info.fb_base_vaddr as *mut u8, info.fb_size) };
         let size = Size::new(info.width, info.height);
-        Self {
-            size,
-            fb,
-            flush_count: 0,
-            total_flush_duration: Duration::new(0, 0),
-            final_flush_duration: Duration::new(0, 0),
-        }
+        Self { size, fb }
     }
 
-    pub fn flush(&mut self) {
-        let start = Instant::now();
-
+    pub fn flush(&self) {
         api::ax_framebuffer_flush();
-
-        let duration = start.elapsed();
-        self.total_flush_duration += duration;
-        self.flush_count += 1;
-
-        if self.flush_count == 50 {
-            info!(
-                "average flush time for 50 flushes: {:?}",
-                self.total_flush_duration / 50
-            );
-            self.flush_count = 0;
-            self.final_flush_duration += self.total_flush_duration;
-            self.total_flush_duration = Duration::new(0, 0);
-        }
-    }
-
-    pub fn final_flush_duration(&mut self) -> Duration {
-        self.final_flush_duration
     }
 }
 
@@ -93,7 +55,6 @@ impl DrawTarget for Display {
             self.fb[idx + 1] = px.1.g();
             self.fb[idx + 2] = px.1.r();
         });
-
         Ok(())
     }
 }

@@ -25,8 +25,8 @@ mount -o bind /dev $ROOTFS/dev
 mount -o bind /dev/pts $ROOTFS/dev/pts
 
 # 拷贝hvisor-tool内核模块以及命令行工具
-cp $HVISOR_TOOL/driver/hvisor.ko $ZONEBASE
-cp $HVISOR_TOOL/tools/hvisor $ZONEBASE
+# cp $HVISOR_TOOL/driver/hvisor.ko $ZONEBASE
+# cp $HVISOR_TOOL/tools/hvisor $ZONEBASE
 
 # 拷贝所有配置
 # 递归遍历CONFIG路径，把其中的每个文件拷贝到rootfs
@@ -37,7 +37,6 @@ done
 # 拷贝运行脚本
 cp $SCRIPTS/start_linux.sh $ZONEBASE
 cp $SCRIPTS/start_ruxos_display.sh $ZONEBASE
-cp $SCRIPTS/start_ruxos_display_imx8mp.sh $ZONEBASE
 cp $SCRIPTS/start_ruxos_hello.sh $ZONEBASE
 cp $SCRIPTS/clean_up.sh $ZONEBASE
 
@@ -61,8 +60,8 @@ elif [ "$TARGET" = "ruxos_display" ]; then
 
     cp $DEVICETREE/qemu-ruxos.dtb $ZONEBASE
     cp $DEVICETREE/imx8mp-ruxos.dtb $ZONEBASE
-    cp $RUXOS/apps/display/basic_painting/basic_painting_aarch64-qemu-virt.bin $ZONEBASE
-    cp $RUXOS/apps/display/draw_map/draw_map_aarch64-qemu-virt.bin $ZONEBASE
+    # cp $RUXOS/apps/display/basic_painting/basic_painting_aarch64-qemu-virt.bin $ZONEBASE
+    # cp $RUXOS/apps/display/draw_map/draw_map_aarch64-qemu-virt.bin $ZONEBASE
 
 elif [ "$TARGET" = "all" ]; then
     echo "Target is all"
@@ -78,7 +77,7 @@ elif [ "$TARGET" = "all" ]; then
 
     # ruxos_display
     cp $RUXOS/apps/display/basic_painting/basic_painting_aarch64-qemu-virt.bin $ZONEBASE
-    cp $RUXOS/apps/display/draw_map/draw_map_aarch64-qemu-virt.bin $ZONEBASE
+    # cp $RUXOS/apps/display/draw_map/draw_map_aarch64-qemu-virt.bin $ZONEBASE
 fi
 
 echo "DONE" 

@@ -3,6 +3,7 @@
 #include "virtio.h"
 #include "virtio_gpu.h"
 #include <pthread.h>
+#include <stdint.h>
 #include <stdlib.h>
 
 void *virtio_gpu_handler(void *dev) {
@@ -11,6 +12,12 @@ void *virtio_gpu_handler(void *dev) {
     GPUCommand *gcmd = NULL;
 
     uint32_t request_cnt = 0;
+
+    /// time
+    uint32_t time_measure_cnt = 0;
+    struct timespec start;
+    struct timespec end;
+    double one_thousand_time = 0;
 
     pthread_mutex_lock(&gdev->queue_mutex);
     for (;;) {
@@ -29,10 +36,31 @@ void *virtio_gpu_handler(void *dev) {
 
             pthread_mutex_unlock(&gdev->queue_mutex);
 
+            /// time
+            clock_gettime(CLOCK_MONOTONIC, &start);
+
             // Release the lock and start processing
             virtio_gpu_simple_process_cmd(gcmd, vdev);
             // Notify the frontend and free memory after the command is
             // completed, iov is freed by virtio_gpu_simple_process_cmd
+
+            /// time
+            clock_gettime(CLOCK_MONOTONIC, &end);
+            one_thousand_time += (end.tv_sec - start.tv_sec) * 1000 +
+                                 (end.tv_nsec - start.tv_nsec) / 1e6;
+
+            time_measure_cnt++;
+
+            if (time_measure_cnt >= 1000) {
+                double average_time = one_thousand_time / time_measure_cnt;
+                log_info(
+                    "%s: total time for 1000 requests: %f ms, average time: "
+                    "%f ms",
+                    __func__, one_thousand_time, average_time);
+
+                time_measure_cnt = 0;
+                one_thousand_time = 0;
+            }
 
             request_cnt++;
 

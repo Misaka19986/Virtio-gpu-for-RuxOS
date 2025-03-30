@@ -49,13 +49,13 @@ struct arch_zone_config {
     __u64 gicr_size;
     __u64 gits_base;
     __u64 gits_size;
-    __u64 gicc_base;
-    __u64 gicc_offset;
-    __u64 gicc_size;
-    __u64 gich_base;
-    __u64 gich_size;
-    __u64 gicv_base;
-    __u64 gicv_size;
+    // __u64 gicc_base;
+    // __u64 gicc_offset;
+    // __u64 gicc_size;
+    // __u64 gich_base;
+    // __u64 gich_size;
+    // __u64 gicv_base;
+    // __u64 gicv_size;
 };
 #endif
 

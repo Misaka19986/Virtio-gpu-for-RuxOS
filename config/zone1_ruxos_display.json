@@ -17,13 +17,13 @@
             "physical_start": "0x9000000",
             "virtual_start": "0x9000000",
             "size": "0x1000"
-        },  // uart
+        },
         {
             "type": "io",
             "physical_start": "0x9010000",
             "virtual_start": "0x9010000",
             "size": "0x1000"
-        },  // rtc
+        },
         {
             "type": "io",
             "physical_start": "0x8060000",
@@ -35,7 +35,7 @@
             "physical_start": "0x8000000",
             "virtual_start": "0x8000000",
             "size": "0x40000"
-        },  // gic
+        },
         {
             "type": "virtio",
             "physical_start": "0xa000000",
