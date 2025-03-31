@@ -9,6 +9,7 @@ DEVICETREE=../hvisor/images/aarch64/devicetree
 ZONEBASE=$ROOTFS/home/arm64
 RUXOS=../ruxos
 SCRIPTS=./
+LINUX_DRM_TEST=../linux-drm-test/linux-drm-test
 
 # 挂载镜像
 cp /etc/resolv.conf $ROOTFS/etc/resolv.conf
@@ -55,8 +56,12 @@ elif [ "$TARGET" = "ruxos_display" ]; then
 
     cp $DEVICETREE/qemu-ruxos.dtb $ZONEBASE
     cp $DEVICETREE/imx8mp-ruxos.dtb $ZONEBASE
-    cp $RUXOS/apps/display/basic_painting/basic_painting_aarch64-qemu-virt.bin $ZONEBASE
-    cp $RUXOS/apps/display/draw_map/draw_map_aarch64-qemu-virt.bin $ZONEBASE
+    # cp $RUXOS/apps/display/basic_painting/basic_painting_aarch64-qemu-virt.bin $ZONEBASE
+    # cp $RUXOS/apps/display/draw_map/draw_map_aarch64-qemu-virt.bin $ZONEBASE
+elif [ "$TARGET" = "linux_drm_test" ]; then
+    echo "Target is linux_drm_test"
+
+    cp $LINUX_DRM_TEST/target/aarch64-unknown-linux-gnu/release/linux-drm-test $ZONEBASE
 
 elif [ "$TARGET" = "all" ]; then
     echo "Target is all"
@@ -71,8 +76,11 @@ elif [ "$TARGET" = "all" ]; then
     cp $RUXOS/apps/c/helloworld/helloworld_aarch64-qemu-virt.bin $ZONEBASE
 
     # ruxos_display
-    cp $RUXOS/apps/display/basic_painting/basic_painting_aarch64-qemu-virt.bin $ZONEBASE
-    cp $RUXOS/apps/display/draw_map/draw_map_aarch64-qemu-virt.bin $ZONEBASE
+    # cp $RUXOS/apps/display/basic_painting/basic_painting_aarch64-qemu-virt.bin $ZONEBASE
+    # cp $RUXOS/apps/display/draw_map/draw_map_aarch64-qemu-virt.bin $ZONEBASE
+
+    # linux_drm_test
+    cp $LINUX_DRM_TEST/target/aarch64-unknown-linux-gnu/release/linux-drm-test $ZONEBASE
 fi
 
 echo "DONE" 

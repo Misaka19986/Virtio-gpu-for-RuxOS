@@ -1,7 +1,8 @@
 {
 	/* rust */
 	"rust-analyzer.linkedProjects": [
-		"./hvisor/Cargo.toml"
+		// "${workspaceFolder}/linux-drm-test/linux-drm-test/Cargo.toml",
+		"${workspaceFolder}/hvisor/Cargo.toml",
 	],
 	// Prevent "can't find crate for `test`" error on no_std
 	// Ref: https://github.com/rust-lang/vscode-rust/issues/729

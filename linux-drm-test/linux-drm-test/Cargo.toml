@@ -1,0 +1,10 @@
+[package]
+name = "linux-drm-test"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+drm = "0.14.1"
+drm-ffi = "0.9.0"
+embedded-graphics = "0.8"
+nix = "0.29.0"
